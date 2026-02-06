@@ -3,19 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Sync & PiP)</title>
+    <title>OSCE Master (Full Restore)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        /* --- ORIGINAL STYLING RESTORED --- */
+        /* --- ORIGINAL PALETTE & VARIABLES --- */
         :root {
             --bg: #121212; --surf: #1e1e1e; --text: #ffffff;
             --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444;
-            
-            /* Logic Colors */
             --prep-color: #d97706; --station-color: #059669; --move-color: #2563eb;
             --ready-color: #374151; --standby-color: #0f172a; --stop-color: #b91c1c;
             --intermission-color: #111; --extra-prep: #7c2d12; --extra-station: #064e3b;
-            
             --sidebar-bg: #111; --border: #333;
         }
 
@@ -30,9 +27,10 @@
         #view-landing { align-items: center; justify-content: center; gap: 20px; z-index: 200; background: var(--bg); }
         .btn-xl { padding: 25px 40px; font-size: 1.5rem; border: none; border-radius: 12px; width: 90%; max-width: 350px; font-weight: bold; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s; }
         .btn-host { background: var(--accent); box-shadow: 0 4px 15px rgba(37,99,235,0.4); }
+        .btn-remote { background: var(--green); box-shadow: 0 4px 15px rgba(16,185,129,0.4); }
         .btn-xl:active { transform: scale(0.98); }
 
-        /* 2. SETUP (Original Layout) */
+        /* 2. SETUP (Host) */
         #view-setup { padding: 40px; max-width: 900px; margin: 0 auto; width: 100%; overflow-y: auto; }
         .card { background: var(--surf); padding: 25px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         h2 { margin-top: 0; font-weight: 300; border-bottom: 1px solid #444; padding-bottom: 10px; }
@@ -40,10 +38,10 @@
         .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
         label { display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 5px; }
         input, select { background: #333; border: 1px solid #555; color: white; padding: 10px; width: 100%; border-radius: 6px; }
-        .input-wrapper { display: flex; gap: 5px; } /* Restored Wrapper */
+        .input-wrapper { display: flex; gap: 5px; }
         .btn-full { width: 100%; padding: 15px; background: var(--accent); color: white; border: none; font-size: 1.2rem; font-weight: bold; cursor: pointer; margin-top: 10px; border-radius: 8px; }
 
-        /* 3. DASHBOARD */
+        /* 3. DASHBOARD (Host) */
         #view-run { display: none; height: 100vh; width: 100vw; grid-template-columns: 20% 60% 20%; }
         
         .sidebar { background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; height: 100%; }
@@ -62,28 +60,40 @@
         
         /* Elements to Move to PiP */
         #stage-content { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
-        
         #status-text { font-size: 5vw; font-weight: 800; text-transform: uppercase; margin: 0; line-height: 1; text-shadow: 0 4px 20px rgba(0,0,0,0.3); }
         #timer { font-size: 15vw; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; margin: 20px 0; }
         #info-bar { font-size: 1.5vw; background: rgba(0,0,0,0.4); padding: 10px 40px; border-radius: 50px; margin-top: 20px; color: rgba(255,255,255,0.9); }
 
-        /* Phases (Original Logic Colors) */
+        /* Phases */
         .mode-standby { background: var(--standby-color); } .mode-ready { background: var(--ready-color); }
         .mode-prep { background: var(--prep-color); } .mode-station { background: var(--station-color); }
         .mode-move { background: var(--move-color); } .mode-intermission { background: var(--intermission-color); }
         .mode-et-prep { background: var(--extra-prep); } .mode-et-station { background: var(--extra-station); }
         .mode-done { background: var(--stop-color); }
 
-        /* Actions */
         #action-btn { display: none; margin-top: 30px; font-size: 2rem; padding: 20px 60px; background: white; color: black; border: none; border-radius: 50px; cursor: pointer; animation: pulse 2s infinite; box-shadow: 0 0 20px rgba(0,0,0,0.5); z-index: 100; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        /* Tools */
-        #top-right-tools { position: absolute; top: 20px; right: 20px; z-index: 1000; display: flex; gap: 10px; }
+        /* PIP & Share Tools */
+        #top-right-tools { position: absolute; top: 20px; right: 20px; z-index: 1000; }
         .tool-btn { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; font-weight: bold; }
         .tool-btn:hover { background: rgba(255,255,255,0.2); }
         
         #host-share-bar { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.9); padding: 10px; text-align: center; border-top: 1px solid #444; display: none; }
+        
+        /* 4. REMOTE */
+        #view-remote-login { align-items: center; justify-content: center; padding: 20px; }
+        #remote-code-input { font-size: 3rem; width: 200px; text-align: center; margin: 20px 0; background: #333; border: 2px solid #555; color: white; border-radius: 12px; padding: 10px; letter-spacing: 5px; }
+        
+        #view-remote { align-items: center; justify-content: center; padding: 20px; }
+        .rem-grid { display: grid; grid-template-rows: 1fr 2fr 1fr; width: 100%; height: 100%; gap: 15px; max-width: 500px; }
+        .rem-status { background: #222; border-radius: 15px; border: 1px solid #333; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: background 0.3s; }
+        .rem-btn { border: none; border-radius: 15px; font-size: 1.8rem; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+        .rem-btn:active { transform: translateY(4px); box-shadow: none; }
+        .btn-next { background: var(--accent); }
+        .btn-pause { background: var(--amber); }
+        .btn-exit { background: var(--red); }
+        
         .hidden { display: none !important; }
     </style>
 </head>
@@ -92,40 +102,23 @@
     <div id="view-landing" class="view active">
         <h1 style="font-size:3rem; margin-bottom:40px;">OSCE Manager</h1>
         <button class="btn-xl btn-host" onclick="initHost()">💻 START AS HOST</button>
+        <button class="btn-xl btn-remote" onclick="initRemote()">📱 START AS REMOTE</button>
         <div id="viewer-msg" style="display:none; color:#aaa; margin-top:20px;">Connecting as Viewer...</div>
     </div>
 
     <div id="view-setup" class="view">
         <div class="card">
             <h2>Student Data</h2>
-            <textarea id="paste-area" placeholder="Paste data here...&#10;Noah    Red&#10;Nargis  Green"></textarea>
+            <textarea id="paste-area" placeholder="ET     Noah    Red&#10;        Nargis  Green"></textarea>
             <button class="btn-full" style="background:#4b5563; width:auto; padding:10px 20px; font-size:1rem;" onclick="analyze()">Analyze</button>
             <span id="analysis-summary" style="color:#aaa; margin-left:10px;"></span>
         </div>
         <div class="card">
             <h2>Configuration</h2>
             <div class="config-grid">
-                <div>
-                    <label>Prep Time</label>
-                    <div class="input-wrapper">
-                        <input type="number" id="val-prep" value="1">
-                        <select id="unit-prep"><option value="min">Min</option><option value="sec">Sec</option></select>
-                    </div>
-                </div>
-                <div>
-                    <label>Station Time</label>
-                    <div class="input-wrapper">
-                        <input type="number" id="val-station" value="7">
-                        <select id="unit-station"><option value="min">Min</option><option value="sec">Sec</option></select>
-                    </div>
-                </div>
-                <div>
-                    <label>Move Time</label>
-                    <div class="input-wrapper">
-                        <input type="number" id="val-move" value="1">
-                        <select id="unit-move"><option value="min">Min</option><option value="sec">Sec</option></select>
-                    </div>
-                </div>
+                <div><label>Prep Time</label><div class="input-wrapper"><input type="number" id="val-prep" value="1"><select id="unit-prep"><option value="min">Min</option><option value="sec">Sec</option></select></div></div>
+                <div><label>Station Time</label><div class="input-wrapper"><input type="number" id="val-station" value="7"><select id="unit-station"><option value="min">Min</option><option value="sec">Sec</option></select></div></div>
+                <div><label>Move Time</label><div class="input-wrapper"><input type="number" id="val-move" value="1"><select id="unit-move"><option value="min">Min</option><option value="sec">Sec</option></select></div></div>
                 <div><label>Lead-In (Start)</label><input type="number" id="val-leadin" value="10"></div>
                 <div><label>Max Capacity</label><input type="number" id="capacity" value="12"></div>
                 <div><label>Stations/Circuit</label><input type="number" id="stations-count" value="4"></div>
@@ -154,7 +147,7 @@
             <button id="action-btn" onclick="nextSection()">BEGIN</button>
 
             <div id="host-share-bar">
-                <span style="color:#888;">Viewer Link:</span>
+                <span style="color:#888;">Code:</span>
                 <span id="link-display" style="color:var(--accent); font-weight:bold; margin:0 10px; cursor:pointer;" onclick="copyLink()">[Click to Copy]</span>
             </div>
         </div>
@@ -165,15 +158,33 @@
         </div>
     </div>
 
+    <div id="view-remote-login" class="view">
+        <h2>ENTER EXAM CODE</h2>
+        <input type="number" id="remote-code-input" placeholder="0000">
+        <button class="btn-xl btn-remote" onclick="connectRemote()">CONNECT</button>
+        <p id="rem-msg" style="color:var(--amber); margin-top:20px;"></p>
+    </div>
+
+    <div id="view-remote" class="view">
+        <div class="rem-grid">
+            <div class="rem-status" id="rem-bg">
+                <div id="rem-lbl" style="font-size:1.5rem; font-weight:bold;">READY</div>
+                <div id="rem-time" style="font-size:4rem; font-family:monospace; font-weight:bold;">--:--</div>
+                <div id="rem-sub" style="color:#aaa;">Waiting...</div>
+            </div>
+            <button class="rem-btn btn-next" onclick="sendCmd('CLICK')">NEXT / START</button>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                <button class="rem-btn btn-pause" onclick="sendCmd('PAUSE')">PAUSE</button>
+                <button class="rem-btn btn-exit" onclick="location.reload()">EXIT</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // CONFIG
         const BROKER = "broker.emqx.io";
         const PORT = 8084;
         let client = null, examID = "", isHost = false, pipWindow = null;
-        
-        // CACHED DOM ELEMENTS (Crucial for PiP)
-        // We capture these once. Updating .innerText on these variables works 
-        // regardless of whether they are in the main window or PiP window.
         let elStatus, elTimer, elInfo, elStageBg, elActionBtn;
 
         // STATE
@@ -183,14 +194,12 @@
         let audioCtx = null;
 
         window.onload = () => {
-            // Initialize DOM References
             elStatus = document.getElementById('status-text');
             elTimer = document.getElementById('timer');
             elInfo = document.getElementById('info-bar');
             elStageBg = document.getElementById('main-stage-bg');
             elActionBtn = document.getElementById('action-btn');
 
-            // Check URL for Join
             const params = new URLSearchParams(window.location.search);
             const joinID = params.get('join');
             if(joinID) {
@@ -198,6 +207,7 @@
                 examID = joinID;
                 document.getElementById('viewer-msg').style.display = 'block';
                 document.querySelector('.btn-host').style.display = 'none';
+                document.querySelector('.btn-remote').style.display = 'none';
                 connectMQTT(joinID);
             }
         };
@@ -208,18 +218,10 @@
             if(id==='view-run') document.getElementById('view-run').style.display='grid';
         }
 
-        // --- HOST SETUP ---
-        function initHost() {
-            isHost = true;
-            examID = Math.floor(100000 + Math.random() * 900000).toString();
-            switchView('view-setup');
-            connectMQTT(examID);
-        }
-
-        function getSeconds(valId, unitId) {
-            const val = parseFloat(document.getElementById(valId).value) || 0;
-            return document.getElementById(unitId).value === 'min' ? val * 60 : val;
-        }
+        function initHost() { isHost = true; examID = Math.floor(1000 + Math.random() * 9000).toString(); switchView('view-setup'); connectMQTT(examID); }
+        function initRemote() { isHost = false; switchView('view-remote-login'); }
+        function connectRemote() { examID = document.getElementById('remote-code-input').value; connectMQTT(examID); }
+        function getSeconds(valId, unitId) { const val = parseFloat(document.getElementById(valId).value)||0; return document.getElementById(unitId).value==='min'?val*60:val; }
 
         function analyze() {
             const raw = document.getElementById('paste-area').value;
@@ -257,13 +259,13 @@
                 if (isExtra) etStudents.push(obj); else stdStudents.push(obj);
             });
 
-            document.getElementById('analysis-summary').innerText = 
-                `Found: ${etStudents.length} ET, ${stdStudents.length} Standard`;
+            const etF = Math.ceil(etStudents.length/capacity);
+            const stdF = Math.ceil(stdStudents.length/capacity);
+            document.getElementById('analysis-summary').innerText = `Found: ${etStudents.length} ET (${etF} flights), ${stdStudents.length} STD (${stdF} flights)`;
         }
 
         function startExam() {
             if(etStudents.length===0 && stdStudents.length===0) analyze();
-            
             const basePrep = getSeconds('val-prep', 'unit-prep');
             const baseStation = getSeconds('val-station', 'unit-station');
             const baseMove = getSeconds('val-move', 'unit-move');
@@ -275,14 +277,12 @@
 
             if(leadIn > 0) schedule.push({ type:'LEAD_IN', phase:'READY', duration:leadIn, label:'GET READY', sub:'STARTING...', colorClass:'mode-ready', nextType:(etStudents.length>0)?'ET':'STD', nextIdx:0 });
 
-            // Generate Flights
             const createFlight = (type, idx) => {
                 const isET = type === 'ET';
                 const p = isET ? basePrep * 1.25 : basePrep;
                 const s = isET ? baseStation * 1.25 : baseStation;
                 const cP = isET ? 'mode-et-prep' : 'mode-prep';
                 const cS = isET ? 'mode-et-station' : 'mode-station';
-                
                 for(let i=1; i<=stationsCount; i++) {
                     schedule.push({ type, phase:'PREP', duration:p, label:'PREPARATION', sub:`${type} FLIGHT ${idx+1} - STATION ${i}`, colorClass:cP, flightIndex:idx });
                     schedule.push({ type, phase:'STATION', duration:s, label:'STATION', sub:`${type} FLIGHT ${idx+1} - STATION ${i}`, colorClass:cS, flightIndex:idx });
@@ -302,31 +302,26 @@
                 if(i+1<stdCount) schedule.push({ type:'INTERMISSION', phase:'PAUSE', duration:0, label:'INTERMISSION', sub:'NEXT GROUP', colorClass:'mode-intermission', nextType:'STD', nextIdx:i+1 });
             }
 
-            // UI Setup
             document.getElementById('host-share-bar').style.display = 'block';
+            document.getElementById('link-display').innerText = examID;
             switchView('view-run');
             currentStepIndex = 0;
             runStep();
             broadcast();
         }
 
-        // --- RUN ENGINE ---
         function runStep() {
             if (currentStepIndex >= schedule.length) { finish(); return; }
             const step = schedule[currentStepIndex];
             
-            // UPDATE DISPLAY
             elStatus.innerText = step.label;
             elInfo.innerText = step.sub;
-            
-            // Set Color - Handle PiP Sync
             const colorClass = 'main-stage ' + step.colorClass;
             elStageBg.className = colorClass;
             if (pipWindow) pipWindow.document.body.className = colorClass;
 
             updateSidebars(step);
 
-            // HANDLE PAUSES
             if(step.phase === 'WAIT' || step.phase === 'PAUSE') {
                 clearInterval(timerInterval);
                 elTimer.innerText = "--:--";
@@ -337,7 +332,6 @@
                 return;
             }
 
-            // RUN TIMER
             elActionBtn.style.display = 'none';
             timeLeft = Math.floor(step.duration);
             updateTimerDisplay();
@@ -362,54 +356,97 @@
             const s = (timeLeft % 60).toString().padStart(2,'0');
             elTimer.innerText = `${m}:${s}`;
         }
-
         function nextSection() { currentStepIndex++; runStep(); }
         function finish() {
             clearInterval(timerInterval);
-            elStatus.innerText = "DONE";
-            elTimer.innerText = "00:00";
-            elStageBg.className = 'main-stage mode-done';
+            elStatus.innerText = "DONE"; elTimer.innerText = "00:00"; elStageBg.className = 'main-stage mode-done';
             if(pipWindow) pipWindow.document.body.className = 'main-stage mode-done';
             broadcast();
         }
-
-        function updateSidebars(step) {
-            // Placeholder for sidebar logic:
-            // Slicing arrays based on step.flightIndex and step.type
-            // (Simplified for stability as per instruction, but lists cleared to avoid confusion)
-            if(step.type === 'STANDBY' || step.type === 'INTERMISSION') {
-                // Show next group
-            }
-        }
-
         function playBeep(f, d) {
             if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             try {
                 const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
                 o.connect(g); g.connect(audioCtx.destination);
                 o.frequency.value = f; o.start(); 
-                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d);
-                o.stop(audioCtx.currentTime + d);
+                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d); o.stop(audioCtx.currentTime + d);
             } catch(e){}
         }
 
-        // --- SYNC & NETWORK ---
+        // --- STUDENT LIST LOGIC ---
+        function updateSidebars(step) {
+            let cur = [], nxt = [];
+            const getSlice = (arr, i) => arr.slice(i*capacity, (i*capacity)+capacity);
+            
+            // Logic: Determine which flight is "Active" and which is "Next"
+            if (step.type === 'STANDBY' || step.type === 'LEAD_IN' || step.type === 'INTERMISSION') {
+                document.getElementById('lbl-left').innerText = "Get Ready";
+                const type = step.nextType; 
+                const idx = step.nextIdx;
+                if(type === 'ET') cur = getSlice(etStudents, idx);
+                else cur = getSlice(stdStudents, idx);
+                
+                // Determine next
+                const etF = Math.ceil(etStudents.length/capacity);
+                const stdF = Math.ceil(stdStudents.length/capacity);
+                
+                if(type === 'ET') {
+                    if(idx+1 < etF) nxt = getSlice(etStudents, idx+1);
+                    else if(stdStudents.length > 0) nxt = getSlice(stdStudents, 0);
+                } else {
+                    if(idx+1 < stdF) nxt = getSlice(stdStudents, idx+1);
+                }
+
+            } else {
+                document.getElementById('lbl-left').innerText = "Current";
+                if(step.type === 'ET') cur = getSlice(etStudents, step.flightIndex);
+                else cur = getSlice(stdStudents, step.flightIndex);
+                // Simple placeholder for next logic during run
+                nxt = []; // Clear next during run to avoid confusion or add complex calc if needed
+            }
+            renderStudentList('list-current', cur);
+            renderStudentList('list-next', nxt);
+        }
+
+        function renderStudentList(id, list) {
+            const ul = document.getElementById(id); ul.innerHTML = '';
+            if(!list || list.length===0) { ul.innerHTML = '<li style="padding:10px; color:#555; text-align:center;">-</li>'; return; }
+            list.forEach(s => {
+                const li = document.createElement('li');
+                let c = ""; const g = (s.group||"").toLowerCase();
+                if(g.includes('red')) c='grp-red'; else if(g.includes('blue')) c='grp-blue'; else if(g.includes('green')) c='grp-green'; else if(g.includes('yellow')) c='grp-yellow';
+                li.className = `student-item ${c}`;
+                li.innerHTML = `<span>${s.name}</span><span class="group-tag">${s.group}</span>`;
+                ul.appendChild(li);
+            });
+        }
+
+        // --- NETWORK ---
         function connectMQTT(id) {
-            const clientId = (isHost?"host_":"view_") + Math.random().toString(16).substr(2,8);
+            const clientId = (isHost?"host_":"rem_") + Math.random().toString(16).substr(2,8);
             client = new Paho.MQTT.Client(BROKER, PORT, "/mqtt", clientId);
             
             client.onMessageArrived = (msg) => {
-                if(isHost) return;
                 const d = JSON.parse(msg.payloadString);
-                
-                // Viewer Update
-                elStatus.innerText = d.lbl;
-                elTimer.innerText = d.time;
-                elInfo.innerText = d.sub;
-                
-                const colClass = 'main-stage ' + d.col;
-                elStageBg.className = colClass;
-                if(pipWindow) pipWindow.document.body.className = colClass;
+                if(isHost) {
+                    if(d.act === 'CLICK' && elActionBtn.style.display !== 'none') nextSection();
+                    if(d.act === 'PAUSE') { isPaused = !isPaused; broadcast(); }
+                } else {
+                    // REMOTE OR VIEWER
+                    if(document.getElementById('view-remote').classList.contains('active')) {
+                        document.getElementById('rem-lbl').innerText = d.lbl;
+                        document.getElementById('rem-time').innerText = d.time;
+                        document.getElementById('rem-sub').innerText = d.sub;
+                        document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+d.col.replace('main-stage mode-','')+'-color'); 
+                        // Note: The color mapping above is a quick hack, normally send hex or ensure mapping exists
+                    } else if (document.getElementById('view-run').classList.contains('active')) {
+                        // VIEWER MODE
+                        elStatus.innerText = d.lbl; elTimer.innerText = d.time; elInfo.innerText = d.sub;
+                        const colClass = 'main-stage ' + d.col;
+                        elStageBg.className = colClass;
+                        if(pipWindow) pipWindow.document.body.className = colClass;
+                    }
+                }
             };
 
             client.connect({
@@ -418,8 +455,8 @@
                     if(isHost) client.subscribe(`osce/${id}/cmd`);
                     else {
                         client.subscribe(`osce/${id}/state`);
-                        switchView('view-run');
-                        elActionBtn.style.display = 'none'; // Ensure hidden for viewer
+                        if(document.getElementById('view-remote-login').classList.contains('active')) switchView('view-remote');
+                        else if(!isHost && !document.getElementById('view-landing').classList.contains('active')) switchView('view-run');
                     }
                 }
             });
@@ -427,60 +464,30 @@
 
         function broadcast() {
             if(!isHost || !client || !client.isConnected()) return;
-            const msg = {
-                lbl: elStatus.innerText,
-                time: elTimer.innerText,
-                sub: elInfo.innerText,
-                col: elStageBg.className.split(' ').pop()
-            };
-            const m = new Paho.MQTT.Message(JSON.stringify(msg));
-            m.destinationName = `osce/${examID}/state`;
-            m.retained = true;
-            client.send(m);
+            const msg = { lbl: elStatus.innerText, time: elTimer.innerText, sub: elInfo.innerText, col: elStageBg.className.split(' ').pop() };
+            const m = new Paho.MQTT.Message(JSON.stringify(msg)); m.destinationName = `osce/${examID}/state`; m.retained = true; client.send(m);
         }
-
+        function sendCmd(act) {
+            if(!client || !client.isConnected()) return;
+            const m = new Paho.MQTT.Message(JSON.stringify({ act })); m.destinationName = `osce/${examID}/cmd`; client.send(m);
+        }
         function copyLink() {
             const link = `${window.location.origin}${window.location.pathname}?join=${examID}`;
-            navigator.clipboard.writeText(link);
-            alert("Viewer Link Copied!");
+            navigator.clipboard.writeText(link); alert("Link Copied!");
         }
 
-        // --- POP OUT LOGIC (FIXED) ---
+        // --- POP OUT ---
         async function togglePiP() {
-            if (!window.documentPictureInPicture) return alert("Please use Chrome or Edge.");
-            
-            if (pipWindow) {
-                pipWindow.close();
-                return;
-            }
-
-            // 1. Open Window
+            if (!window.documentPictureInPicture) return alert("Use Chrome/Edge.");
+            if (pipWindow) { pipWindow.close(); return; }
             pipWindow = await window.documentPictureInPicture.requestWindow({ width: 500, height: 350 });
-
-            // 2. Clone Styles
-            [...document.head.querySelectorAll('style, link')].forEach(el => 
-                pipWindow.document.head.appendChild(el.cloneNode(true)));
-
-            // 3. Setup Body & Layout
-            const body = pipWindow.document.body;
-            body.className = elStageBg.className; // Initial Sync
-            body.style.display = "flex";
-            body.style.flexDirection = "column";
-            body.style.justifyContent = "center";
-            body.style.alignItems = "center";
-            body.style.margin = "0";
-            body.style.height = "100vh";
+            [...document.head.querySelectorAll('style, link')].forEach(el => pipWindow.document.head.appendChild(el.cloneNode(true)));
             
-            // 4. MOVE THE CONTENT
-            // We move the wrapper #stage-content. 
-            // Since elStatus and elTimer are children of this wrapper, they move too.
-            // But our variables (elStatus, elTimer) still point to the same nodes.
+            const body = pipWindow.document.body;
+            body.className = elStageBg.className; body.style.display="flex"; body.style.alignItems="center"; body.style.justifyContent="center"; body.style.height="100vh";
             const content = document.getElementById('stage-content');
             body.append(content);
-
-            // 5. RESTORE ON CLOSE
             pipWindow.addEventListener('pagehide', () => {
-                // Move back to main window before the action button
                 elStageBg.insertBefore(content, elActionBtn);
                 pipWindow = null;
             });
