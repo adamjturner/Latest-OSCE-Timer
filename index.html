@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Connection Fixed)</title>
+    <title>OSCE Master (Stable Connection)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        /* --- CORE VARIABLES --- */
+        /* --- VARIABLES --- */
         :root {
             --bg: #121212; --surf: #1e1e1e; --text: #ffffff;
             --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444;
@@ -78,7 +78,6 @@
         .tool-btn { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; font-weight: bold; transition: background 0.2s; }
         .tool-btn:hover { background: rgba(255,255,255,0.3); }
 
-        /* SHARE BAR */
         #host-share-bar { 
             position: fixed; bottom: 0; left: 0; width: 100%; 
             background: rgba(0,0,0,0.95); padding: 15px; 
@@ -110,7 +109,11 @@
         <h1 style="font-size:3rem; margin-bottom:40px;">OSCE Manager</h1>
         <button class="btn-xl btn-host" onclick="initHost()">💻 START AS HOST</button>
         <button class="btn-xl btn-remote" onclick="initRemote()">📱 START AS REMOTE</button>
-        <div id="viewer-msg" style="display:none; color:#aaa; margin-top:20px; font-size:1.2rem;">Connecting to Session...</div>
+        
+        <div id="viewer-msg" style="display:none; text-align:center;">
+            <p id="viewer-txt" style="color:#aaa; font-size:1.2rem; margin-bottom:20px;">Connecting to Session...</p>
+            <button id="force-load-btn" onclick="forceViewerLoad()" style="display:none; padding:10px 20px; background:#444; color:white; border:none; border-radius:6px; cursor:pointer;">Force Load Dashboard</button>
+        </div>
     </div>
 
     <div id="view-setup" class="view">
@@ -211,9 +214,18 @@
                 document.getElementById('viewer-msg').style.display = 'block';
                 document.querySelector('.btn-host').style.display = 'none';
                 document.querySelector('.btn-remote').style.display = 'none';
+                
+                // FORCE LOAD TIMEOUT
+                setTimeout(() => {
+                    document.getElementById('force-load-btn').style.display = 'inline-block';
+                    document.getElementById('viewer-txt').innerText = "Taking too long?";
+                }, 5000);
+
                 connectMQTT(joinID);
             }
         };
+
+        function forceViewerLoad() { switchView('view-run'); }
 
         function setStatus(connected, msg) {
             const ind = document.getElementById('conn-status');
@@ -295,8 +307,9 @@
             if (currentStepIndex >= schedule.length) { finish(); return; }
             const step = schedule[currentStepIndex];
             elStatus.innerText = step.label; elInfo.innerText = step.sub;
-            elStageBg.className = 'main-stage ' + step.colorClass;
-            if(pipWindow) pipWindow.document.body.className = 'main-stage ' + step.colorClass;
+            const colorClass = 'main-stage ' + step.colorClass;
+            elStageBg.className = colorClass;
+            if (pipWindow) pipWindow.document.body.className = colorClass;
             updateSidebars(step);
             if(step.phase === 'WAIT' || step.phase === 'PAUSE') {
                 targetTime = null; elTimer.innerText = "--:--";
@@ -363,7 +376,7 @@
             setStatus(false, "Connecting...");
             const clientId = (isHost?"host_":"conn_") + Math.random().toString(16).substr(2,8);
             client = new Paho.MQTT.Client(BROKER, PORT, "/mqtt", clientId);
-            client.onConnectionLost = (o) => { setStatus(false, "Lost Connection"); console.log(o); };
+            client.onConnectionLost = (o) => { setStatus(false, "Lost Connection"); };
             client.onMessageArrived = (msg) => {
                 const d = JSON.parse(msg.payloadString);
                 if(isHost) {
@@ -388,13 +401,17 @@
                     if(isHost) { client.subscribe(`osce/${id}/cmd`); } 
                     else { 
                         client.subscribe(`osce/${id}/state`);
-                        // KEY FIX: Move Viewers to Run View Immediately
-                        const isLogin = document.getElementById('view-remote-login').classList.contains('active');
-                        if(isLogin) switchView('view-remote');
-                        else if(!isHost && document.getElementById('view-landing').classList.contains('active')) switchView('view-run');
+                        // FORCE VIEW SWITCH for Viewers
+                        switchView('view-run');
+                        // Also handle Remote login case
+                        if(document.getElementById('view-remote-login').classList.contains('active')) switchView('view-remote');
                     }
                 },
-                onFailure: () => { setStatus(false, "Blocked/Failed"); alert("Network Blocked."); }
+                onFailure: () => { 
+                    setStatus(false, "Blocked/Failed"); 
+                    document.getElementById('viewer-txt').innerText = "Connection Failed. Firewall?";
+                    document.getElementById('force-load-btn').style.display = 'inline-block';
+                }
             });
         }
         function broadcastState() {
