@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Colors Fixed)</title>
+    <title>OSCE Master (Final Fix)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        /* --- ORIGINAL PALETTE RESTORED --- */
+        /* --- CORE VARIABLES --- */
         :root {
             --bg: #121212; --surf: #1e1e1e; --text: #ffffff;
             --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444;
             
-            /* Logic Colors - EXACT MATCH */
+            /* Phase Colors */
             --prep-color: #d97706;      /* Orange */
             --station-color: #059669;   /* Green */
             --move-color: #2563eb;      /* Blue */
@@ -69,25 +69,25 @@
         .student-item { padding: 10px 12px; margin-bottom: 6px; background: #252525; border-radius: 4px; border-left: 5px solid #555; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; }
         .group-tag { font-size: 0.7rem; font-weight: bold; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; background: #444; color: #ddd; min-width: 45px; text-align: center; }
         
-        /* STUDENT COLORS */
+        /* STUDENT TAG COLORS */
         .grp-red { border-left-color: #ef4444 !important; } .grp-red .group-tag { background: #7f1d1d; color: #fecaca; }
         .grp-blue { border-left-color: #3b82f6 !important; } .grp-blue .group-tag { background: #1e3a8a; color: #bfdbfe; }
         .grp-green { border-left-color: #10b981 !important; } .grp-green .group-tag { background: #064e3b; color: #a7f3d0; }
         .grp-yellow { border-left-color: #eab308 !important; } .grp-yellow .group-tag { background: #713f12; color: #fef08a; }
 
-        /* MAIN STAGE & PHASE COLORS */
+        /* MAIN STAGE & PHASES */
         .main-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; height: 100%; transition: background 0.5s; position: relative; overflow: hidden; }
         
-        /* APPLY PHASE COLORS */
-        .mode-standby { background: var(--standby-color); } 
-        .mode-ready { background: var(--ready-color); }
-        .mode-prep { background: var(--prep-color); } 
-        .mode-station { background: var(--station-color); }
-        .mode-move { background: var(--move-color); } 
-        .mode-intermission { background: var(--intermission-color); }
-        .mode-et-prep { background: var(--extra-prep); } 
-        .mode-et-station { background: var(--extra-station); }
-        .mode-done { background: var(--stop-color); }
+        /* SPECIFIC BACKGROUNDS */
+        .main-stage.mode-standby { background-color: var(--standby-color); }
+        .main-stage.mode-ready { background-color: var(--ready-color); }
+        .main-stage.mode-prep { background-color: var(--prep-color); }
+        .main-stage.mode-station { background-color: var(--station-color); }
+        .main-stage.mode-move { background-color: var(--move-color); }
+        .main-stage.mode-intermission { background-color: var(--intermission-color); }
+        .main-stage.mode-et-prep { background-color: var(--extra-prep); }
+        .main-stage.mode-et-station { background-color: var(--extra-station); }
+        .main-stage.mode-done { background-color: var(--stop-color); }
 
         #stage-content { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
         #status-text { font-size: 5vw; font-weight: 800; text-transform: uppercase; margin: 0; line-height: 1; text-shadow: 0 4px 20px rgba(0,0,0,0.3); }
@@ -101,6 +101,7 @@
         .tool-btn { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; font-weight: bold; transition: background 0.2s; }
         .tool-btn:hover { background: rgba(255,255,255,0.3); }
 
+        /* HOST SHARE BAR */
         #host-share-bar { 
             position: fixed; bottom: 0; left: 0; width: 100%; 
             background: rgba(0,0,0,0.95); padding: 15px; 
@@ -132,7 +133,6 @@
         <h1 style="font-size:3rem; margin-bottom:40px;">OSCE Manager</h1>
         <button class="btn-xl btn-host" onclick="initHost()">💻 START AS HOST</button>
         <button class="btn-xl btn-remote" onclick="initRemote()">📱 START AS REMOTE</button>
-        
         <div id="viewer-msg" style="display:none; text-align:center;">
             <p id="viewer-txt" style="color:#aaa; font-size:1.2rem; margin-bottom:20px;">Connecting to Session...</p>
             <button id="force-load-btn" onclick="forceViewerLoad()" style="display:none; padding:10px 20px; background:#444; color:white; border:none; border-radius:6px; cursor:pointer;">Force Load Dashboard</button>
@@ -237,26 +237,20 @@
                 document.getElementById('viewer-msg').style.display = 'block';
                 document.querySelector('.btn-host').style.display = 'none';
                 document.querySelector('.btn-remote').style.display = 'none';
-                
-                // FORCE LOAD TIMEOUT
                 setTimeout(() => {
                     document.getElementById('force-load-btn').style.display = 'inline-block';
                     document.getElementById('viewer-txt').innerText = "Taking too long?";
                 }, 5000);
-
                 connectMQTT(joinID);
             }
         };
 
         function forceViewerLoad() { switchView('view-run'); }
-
         function setStatus(connected, msg) {
-            const ind = document.getElementById('conn-status');
-            const txt = document.getElementById('conn-text');
+            const ind = document.getElementById('conn-status'); const txt = document.getElementById('conn-text');
             if(connected) { ind.classList.add('conn-active'); txt.innerText = "Online"; txt.style.color = "var(--green)"; }
             else { ind.classList.remove('conn-active'); txt.innerText = msg||"Offline"; txt.style.color = "var(--red)"; }
         }
-
         function switchView(id) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.getElementById(id).classList.add('active');
@@ -366,9 +360,12 @@
         }, 100);
         function finish() { targetTime = null; elStatus.innerText = "DONE"; elTimer.innerText = "00:00"; elStageBg.className = 'main-stage mode-done'; if(pipWindow) pipWindow.document.body.className = 'main-stage mode-done'; broadcastState(); }
 
+        // --- SIDEBAR UPDATER (FIXED) ---
         function updateSidebars(step) {
             let cur = [], nxt = [];
             const getSlice = (arr, i) => arr.slice(i*capacity, (i*capacity)+capacity);
+            
+            // Logic for "Active" vs "Standby" phases
             if (step.type === 'STANDBY' || step.type === 'LEAD_IN' || step.type === 'INTERMISSION') {
                 document.getElementById('lbl-left').innerText = "Get Ready";
                 const type = step.nextType; const idx = step.nextIdx;
@@ -379,10 +376,20 @@
             } else {
                 document.getElementById('lbl-left').innerText = "Current";
                 cur = (step.type === 'ET') ? getSlice(etStudents, step.flightIndex) : getSlice(stdStudents, step.flightIndex);
-                nxt = [];
+                // FIX: Calculate "Next" even during active flight
+                const currentIdx = step.flightIndex;
+                const etF = Math.ceil(etStudents.length/capacity); 
+                const stdF = Math.ceil(stdStudents.length/capacity);
+                if(step.type === 'ET') {
+                     if(currentIdx + 1 < etF) nxt = getSlice(etStudents, currentIdx + 1);
+                     else if(stdStudents.length > 0) nxt = getSlice(stdStudents, 0);
+                } else {
+                     if(currentIdx + 1 < stdF) nxt = getSlice(stdStudents, currentIdx + 1);
+                }
             }
             renderStudentList('list-current', cur); renderStudentList('list-next', nxt);
         }
+
         function renderStudentList(id, list) {
             const ul = document.getElementById(id); ul.innerHTML = '';
             if(!list || list.length===0) { ul.innerHTML = '<li style="padding:15px; color:#555; text-align:center;">-</li>'; return; }
@@ -408,9 +415,12 @@
                     return;
                 }
                 targetTime = d.target; isPaused = d.paused; pauseTimeLeft = d.ptl;
+                // Update Remote/Viewer UI
                 if(document.getElementById('view-remote').classList.contains('active')) {
                     document.getElementById('rem-lbl').innerText = d.lbl; document.getElementById('rem-sub').innerText = d.sub;
-                    document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+d.col.replace('main-stage mode-','')+'-color');
+                    // FIX COLOR VAR LOOKUP
+                    const colorName = d.col.replace('mode-','').replace('main-stage','').trim();
+                    document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+colorName+'-color');
                 } else {
                     elStatus.innerText = d.lbl; elInfo.innerText = d.sub;
                     const colClass = 'main-stage ' + d.col; elStageBg.className = colClass;
@@ -424,8 +434,7 @@
                     if(isHost) { client.subscribe(`osce/${id}/cmd`); } 
                     else { 
                         client.subscribe(`osce/${id}/state`);
-                        const isLogin = document.getElementById('view-remote-login').classList.contains('active');
-                        if(isLogin) switchView('view-remote');
+                        if(document.getElementById('view-remote-login').classList.contains('active')) switchView('view-remote');
                         else if(!isHost && document.getElementById('view-landing').classList.contains('active')) switchView('view-run');
                     }
                 },
