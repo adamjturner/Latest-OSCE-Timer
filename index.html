@@ -3,16 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Stable Connection)</title>
+    <title>OSCE Master (Colors Fixed)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        /* --- VARIABLES --- */
+        /* --- ORIGINAL PALETTE RESTORED --- */
         :root {
             --bg: #121212; --surf: #1e1e1e; --text: #ffffff;
             --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444;
-            --prep-color: #d97706; --station-color: #059669; --move-color: #2563eb;
-            --ready-color: #374151; --standby-color: #0f172a; --stop-color: #b91c1c;
-            --intermission-color: #111; --extra-prep: #7c2d12; --extra-station: #064e3b;
+            
+            /* Logic Colors - EXACT MATCH */
+            --prep-color: #d97706;      /* Orange */
+            --station-color: #059669;   /* Green */
+            --move-color: #2563eb;      /* Blue */
+            --ready-color: #374151;     /* Grey */
+            --standby-color: #0f172a;   /* Dark Blue */
+            --stop-color: #b91c1c;      /* Dark Red */
+            --intermission-color: #111; /* Black */
+            --extra-prep: #7c2d12;      /* Dark Orange */
+            --extra-station: #064e3b;   /* Dark Green */
+            
             --sidebar-bg: #111; --border: #333;
         }
 
@@ -60,12 +69,26 @@
         .student-item { padding: 10px 12px; margin-bottom: 6px; background: #252525; border-radius: 4px; border-left: 5px solid #555; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; }
         .group-tag { font-size: 0.7rem; font-weight: bold; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; background: #444; color: #ddd; min-width: 45px; text-align: center; }
         
+        /* STUDENT COLORS */
         .grp-red { border-left-color: #ef4444 !important; } .grp-red .group-tag { background: #7f1d1d; color: #fecaca; }
         .grp-blue { border-left-color: #3b82f6 !important; } .grp-blue .group-tag { background: #1e3a8a; color: #bfdbfe; }
         .grp-green { border-left-color: #10b981 !important; } .grp-green .group-tag { background: #064e3b; color: #a7f3d0; }
         .grp-yellow { border-left-color: #eab308 !important; } .grp-yellow .group-tag { background: #713f12; color: #fef08a; }
 
+        /* MAIN STAGE & PHASE COLORS */
         .main-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; height: 100%; transition: background 0.5s; position: relative; overflow: hidden; }
+        
+        /* APPLY PHASE COLORS */
+        .mode-standby { background: var(--standby-color); } 
+        .mode-ready { background: var(--ready-color); }
+        .mode-prep { background: var(--prep-color); } 
+        .mode-station { background: var(--station-color); }
+        .mode-move { background: var(--move-color); } 
+        .mode-intermission { background: var(--intermission-color); }
+        .mode-et-prep { background: var(--extra-prep); } 
+        .mode-et-station { background: var(--extra-station); }
+        .mode-done { background: var(--stop-color); }
+
         #stage-content { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
         #status-text { font-size: 5vw; font-weight: 800; text-transform: uppercase; margin: 0; line-height: 1; text-shadow: 0 4px 20px rgba(0,0,0,0.3); }
         #timer { font-size: 18vw; font-weight: 700; line-height: 0.9; font-variant-numeric: tabular-nums; margin: 10px 0; letter-spacing: -5px; }
@@ -401,10 +424,9 @@
                     if(isHost) { client.subscribe(`osce/${id}/cmd`); } 
                     else { 
                         client.subscribe(`osce/${id}/state`);
-                        // FORCE VIEW SWITCH for Viewers
-                        switchView('view-run');
-                        // Also handle Remote login case
-                        if(document.getElementById('view-remote-login').classList.contains('active')) switchView('view-remote');
+                        const isLogin = document.getElementById('view-remote-login').classList.contains('active');
+                        if(isLogin) switchView('view-remote');
+                        else if(!isHost && document.getElementById('view-landing').classList.contains('active')) switchView('view-run');
                     }
                 },
                 onFailure: () => { 
