@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OSCE Master (Sync & Pop-Out)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        :root {
+            --bg: #121212; --surf: #1e1e1e; --text: #ffffff;
+            --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444;
+            --prep-color: #d97706; --station-color: #059669; --move-color: #2563eb;
+            --ready-color: #374151; --standby-color: #0f172a; --stop-color: #b91c1c;
+            --intermission-color: #111;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; overflow: hidden; }
+        .view { display: none; width: 100%; height: 100%; flex-direction: column; }
+        .view.active { display: flex; }
+
+        /* DASHBOARD LAYOUT */
+        #view-run { grid-template-columns: 20% 60% 20%; height: 100vh; }
+        .main-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: background 0.5s; }
+        #timer { font-size: 12vw; font-weight: 800; font-variant-numeric: tabular-nums; }
+        
+        /* SHARING UI */
+        #share-box {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px;
+            font-size: 0.8rem; border: 1px solid #444; cursor: pointer;
+        }
+        #share-box:hover { background: #222; }
+
+        /* PIP BUTTON */
+        #pip-btn { position: absolute; top: 20px; right: 20px; padding: 10px; cursor: pointer; background: #333; border: none; color: white; border-radius: 5px; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="view-landing" class="view active" style="align-items:center; justify-content:center;">
+        <h1>OSCE Manager</h1>
+        <button onclick="initHost()" style="padding:20px; background:var(--accent); color:white; border:none; border-radius:8px; cursor:pointer;">💻 START AS HOST</button>
+    </div>
+
+    <div id="view-run" class="view">
+        <div class="sidebar" style="background:#111; border-right:1px solid #333;">
+            <h3 style="padding:20px;">Current</h3>
+            <ul id="list-current"></ul>
+        </div>
+        
+        <div class="main-stage" id="main-stage-bg">
+            <button id="pip-btn" onclick="togglePiP()">📺 Pop Out</button>
+            <div id="status-text" style="font-size:3rem; font-weight:bold;">READY</div>
+            <div id="timer">00:00</div>
+            
+            <div id="share-box" onclick="copyShareLink()">
+                <span>🔗 Click to Copy Viewer Link</span>
+                <div id="room-display" style="color:var(--green); font-weight:bold;">Room: ----</div>
+            </div>
+
+            <button id="action-btn" onclick="nextSection()" style="padding:15px 40px; font-size:1.5rem;">START NEXT</button>
+        </div>
+
+        <div class="sidebar" style="background:#111; border-left:1px solid #333;">
+            <h3 style="padding:20px;">Next</h3>
+            <ul id="list-next"></ul>
+        </div>
+    </div>
+
+    <script>
+        const BROKER = "broker.emqx.io";
+        const PORT = 8084;
+        let client = null, roomID = "", isHost = false, pipWindow = null;
+        let timeLeft = 0, timerInterval = null;
+
+        // CHECK FOR JOIN LINK ON LOAD
+        const urlParams = new URLSearchParams(window.location.search);
+        const joinID = urlParams.get('join');
+
+        if (joinID) {
+            roomID = joinID;
+            isHost = false;
+            startViewerMode();
+        }
+
+        function initHost() {
+            isHost = true;
+            roomID = Math.floor(100000 + Math.random() * 900000).toString();
+            document.getElementById('room-display').innerText = `Room: ${roomID}`;
+            connectMQTT(roomID);
+            switchView('view-run');
+        }
+
+        function startViewerMode() {
+            switchView('view-run');
+            document.getElementById('action-btn').classList.add('hidden');
+            document.getElementById('share-box').classList.add('hidden');
+            connectMQTT(roomID);
+        }
+
+        function connectMQTT(id) {
+            const clientId = (isHost ? "host_" : "view_") + Math.random().toString(16).substr(2, 8);
+            client = new Paho.MQTT.Client(BROKER, PORT, "/mqtt", clientId);
+
+            client.onMessageArrived = (msg) => {
+                if (isHost) return; 
+                const data = JSON.parse(msg.payloadString);
+                updateUI(data.lbl, data.time, data.col);
+            };
+
+            client.connect({
+                useSSL: true,
+                onSuccess: () => {
+                    client.subscribe(`osce/${id}/state`);
+                    console.log("Connected to Room " + id);
+                }
+            });
+        }
+
+        function broadcast() {
+            if (!isHost || !client || !client.isConnected()) return;
+            const bg = window.getComputedStyle(document.getElementById('main-stage-bg')).backgroundColor;
+            const msg = {
+                lbl: document.getElementById('status-text').innerText,
+                time: document.getElementById('timer').innerText,
+                col: bg
+            };
+            const m = new Paho.MQTT.Message(JSON.stringify(msg));
+            m.destinationName = `osce/${roomID}/state`;
+            m.retained = true;
+            client.send(m);
+        }
+
+        function updateUI(lbl, time, col) {
+            document.getElementById('status-text').innerText = lbl;
+            document.getElementById('timer').innerText = time;
+            document.getElementById('main-stage-bg').style.backgroundColor = col;
+        }
+
+        function copyShareLink() {
+            const link = `${window.location.origin}${window.location.pathname}?join=${roomID}`;
+            navigator.clipboard.writeText(link);
+            alert("Viewer link copied to clipboard!");
+        }
+
+        // --- PIP LOGIC ---
+        async function togglePiP() {
+            if (pipWindow) { pipWindow.close(); return; }
+            pipWindow = await window.documentPictureInPicture.requestWindow({ width: 300, height: 200 });
+            
+            const timer = document.getElementById('timer');
+            pipWindow.document.body.style.background = "#000";
+            pipWindow.document.body.style.display = "flex";
+            pipWindow.document.body.style.justifyContent = "center";
+            pipWindow.document.body.style.alignItems = "center";
+            
+            timer.style.fontSize = "4rem";
+            pipWindow.document.body.append(timer);
+
+            pipWindow.addEventListener('pagehide', () => {
+                timer.style.fontSize = "12vw";
+                document.getElementById('main-stage-bg').insertBefore(timer, document.getElementById('share-box'));
+                pipWindow = null;
+            });
+        }
+
+        function switchView(id) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if(id === 'view-run') document.getElementById('view-run').style.display = 'grid';
+        }
+
+        // Example Timer Loop for Testing
+        function nextSection() {
+            let count = 60;
+            document.getElementById('status-text').innerText = "STATION";
+            document.getElementById('main-stage-bg').style.backgroundColor = "var(--green)";
+            
+            setInterval(() => {
+                count--;
+                let m = Math.floor(count/60).toString().padStart(2,'0');
+                let s = (count%60).toString().padStart(2,'0');
+                document.getElementById('timer').innerText = `${m}:${s}`;
+                broadcast(); // Send to viewers
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
