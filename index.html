@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Final Fix)</title>
+    <title>OSCE Master (Remote Timer Fixed)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         /* --- CORE VARIABLES --- */
@@ -31,15 +31,16 @@
         .view { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; flex-direction: column; }
         .view.active { display: flex; }
 
-        /* STATUS DOT */
+        /* STATUS DOT (MOVED TO BOTTOM LEFT) */
         #conn-status {
-            position: fixed; top: 10px; left: 10px; z-index: 9999;
-            background: rgba(0,0,0,0.8); padding: 5px 12px; border-radius: 20px;
-            font-size: 0.75rem; font-weight: bold; color: #aaa;
-            display: flex; align-items: center; gap: 8px; border: 1px solid #333;
+            position: fixed; bottom: 20px; left: 20px; z-index: 9999;
+            background: rgba(0,0,0,0.8); padding: 8px 15px; border-radius: 30px;
+            font-size: 0.8rem; font-weight: bold; color: #aaa;
+            display: flex; align-items: center; gap: 10px; border: 1px solid #333;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
-        #conn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 5px var(--red); transition: background 0.3s; }
-        .conn-active #conn-dot { background: var(--green) !important; box-shadow: 0 0 5px var(--green) !important; }
+        #conn-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); box-shadow: 0 0 5px var(--red); transition: background 0.3s; }
+        .conn-active #conn-dot { background: var(--green) !important; box-shadow: 0 0 8px var(--green) !important; }
 
         /* 1. LANDING */
         #view-landing { align-items: center; justify-content: center; gap: 20px; z-index: 200; background: var(--bg); }
@@ -69,16 +70,14 @@
         .student-item { padding: 10px 12px; margin-bottom: 6px; background: #252525; border-radius: 4px; border-left: 5px solid #555; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; }
         .group-tag { font-size: 0.7rem; font-weight: bold; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; background: #444; color: #ddd; min-width: 45px; text-align: center; }
         
-        /* STUDENT TAG COLORS */
         .grp-red { border-left-color: #ef4444 !important; } .grp-red .group-tag { background: #7f1d1d; color: #fecaca; }
         .grp-blue { border-left-color: #3b82f6 !important; } .grp-blue .group-tag { background: #1e3a8a; color: #bfdbfe; }
         .grp-green { border-left-color: #10b981 !important; } .grp-green .group-tag { background: #064e3b; color: #a7f3d0; }
         .grp-yellow { border-left-color: #eab308 !important; } .grp-yellow .group-tag { background: #713f12; color: #fef08a; }
 
-        /* MAIN STAGE & PHASES */
         .main-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; height: 100%; transition: background 0.5s; position: relative; overflow: hidden; }
         
-        /* SPECIFIC BACKGROUNDS */
+        /* PHASES */
         .main-stage.mode-standby { background-color: var(--standby-color); }
         .main-stage.mode-ready { background-color: var(--ready-color); }
         .main-stage.mode-prep { background-color: var(--prep-color); }
@@ -342,30 +341,36 @@
         function togglePause() { isPaused = !isPaused; if(isPaused) { pauseTimeLeft = targetTime - Date.now(); targetTime = null; } else { targetTime = Date.now() + pauseTimeLeft; } broadcastState(); }
         
         setInterval(() => {
+            let m="00", s="00";
             if (targetTime) {
                 const diff = targetTime - Date.now();
                 if (diff <= 0) {
-                    elTimer.innerText = "00:00";
                     if (isHost && currentStepIndex < schedule.length) { targetTime = null; nextSection(); }
                 } else {
-                    const m = Math.floor(diff / 60000).toString().padStart(2, '0'); const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-                    elTimer.innerText = `${m}:${s}`;
+                    m = Math.floor(diff / 60000).toString().padStart(2, '0');
+                    s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
                 }
             } else {
                  if(isPaused && pauseTimeLeft > 0) {
-                    const m = Math.floor(pauseTimeLeft / 60000).toString().padStart(2, '0'); const s = Math.floor((pauseTimeLeft % 60000) / 1000).toString().padStart(2, '0');
-                    elTimer.innerText = `${m}:${s}`;
+                    m = Math.floor(pauseTimeLeft / 60000).toString().padStart(2, '0');
+                    s = Math.floor((pauseTimeLeft % 60000) / 1000).toString().padStart(2, '0');
                  }
             }
+            const timeStr = `${m}:${s}`;
+            
+            // UPDATE CORRECT TIMER (HOST OR REMOTE)
+            if(document.getElementById('view-remote').classList.contains('active')) {
+                document.getElementById('rem-time').innerText = timeStr;
+            } else {
+                elTimer.innerText = timeStr;
+            }
         }, 100);
+
         function finish() { targetTime = null; elStatus.innerText = "DONE"; elTimer.innerText = "00:00"; elStageBg.className = 'main-stage mode-done'; if(pipWindow) pipWindow.document.body.className = 'main-stage mode-done'; broadcastState(); }
 
-        // --- SIDEBAR UPDATER (FIXED) ---
         function updateSidebars(step) {
             let cur = [], nxt = [];
             const getSlice = (arr, i) => arr.slice(i*capacity, (i*capacity)+capacity);
-            
-            // Logic for "Active" vs "Standby" phases
             if (step.type === 'STANDBY' || step.type === 'LEAD_IN' || step.type === 'INTERMISSION') {
                 document.getElementById('lbl-left').innerText = "Get Ready";
                 const type = step.nextType; const idx = step.nextIdx;
@@ -376,16 +381,10 @@
             } else {
                 document.getElementById('lbl-left').innerText = "Current";
                 cur = (step.type === 'ET') ? getSlice(etStudents, step.flightIndex) : getSlice(stdStudents, step.flightIndex);
-                // FIX: Calculate "Next" even during active flight
                 const currentIdx = step.flightIndex;
-                const etF = Math.ceil(etStudents.length/capacity); 
-                const stdF = Math.ceil(stdStudents.length/capacity);
-                if(step.type === 'ET') {
-                     if(currentIdx + 1 < etF) nxt = getSlice(etStudents, currentIdx + 1);
-                     else if(stdStudents.length > 0) nxt = getSlice(stdStudents, 0);
-                } else {
-                     if(currentIdx + 1 < stdF) nxt = getSlice(stdStudents, currentIdx + 1);
-                }
+                const etF = Math.ceil(etStudents.length/capacity); const stdF = Math.ceil(stdStudents.length/capacity);
+                if(step.type === 'ET') { if(currentIdx + 1 < etF) nxt = getSlice(etStudents, currentIdx + 1); else if(stdStudents.length > 0) nxt = getSlice(stdStudents, 0); } 
+                else { if(currentIdx + 1 < stdF) nxt = getSlice(stdStudents, currentIdx + 1); }
             }
             renderStudentList('list-current', cur); renderStudentList('list-next', nxt);
         }
