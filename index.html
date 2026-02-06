@@ -3,25 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Remote Timer Fixed)</title>
+    <title>OSCE Master (Final Polish)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        /* --- CORE VARIABLES --- */
+        /* --- VARIABLES --- */
         :root {
             --bg: #121212; --surf: #1e1e1e; --text: #ffffff;
             --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444;
-            
-            /* Phase Colors */
-            --prep-color: #d97706;      /* Orange */
-            --station-color: #059669;   /* Green */
-            --move-color: #2563eb;      /* Blue */
-            --ready-color: #374151;     /* Grey */
-            --standby-color: #0f172a;   /* Dark Blue */
-            --stop-color: #b91c1c;      /* Dark Red */
-            --intermission-color: #111; /* Black */
-            --extra-prep: #7c2d12;      /* Dark Orange */
-            --extra-station: #064e3b;   /* Dark Green */
-            
+            --prep-color: #d97706; --station-color: #059669; --move-color: #2563eb;
+            --ready-color: #374151; --standby-color: #0f172a; --stop-color: #b91c1c;
+            --intermission-color: #111; --extra-prep: #7c2d12; --extra-station: #064e3b;
             --sidebar-bg: #111; --border: #333;
         }
 
@@ -31,7 +22,7 @@
         .view { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; flex-direction: column; }
         .view.active { display: flex; }
 
-        /* STATUS DOT (MOVED TO BOTTOM LEFT) */
+        /* STATUS DOT */
         #conn-status {
             position: fixed; bottom: 20px; left: 20px; z-index: 9999;
             background: rgba(0,0,0,0.8); padding: 8px 15px; border-radius: 30px;
@@ -42,9 +33,11 @@
         #conn-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); box-shadow: 0 0 5px var(--red); transition: background 0.3s; }
         .conn-active #conn-dot { background: var(--green) !important; box-shadow: 0 0 8px var(--green) !important; }
 
-        /* 1. LANDING */
+        /* 1. LANDING (Fixed Layout) */
         #view-landing { align-items: center; justify-content: center; gap: 20px; z-index: 200; background: var(--bg); }
-        .btn-xl { padding: 25px 40px; font-size: 1.5rem; border: none; border-radius: 12px; width: 90%; max-width: 350px; font-weight: bold; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s; }
+        .landing-btn-group { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; width: 100%; }
+        
+        .btn-xl { padding: 25px 40px; font-size: 1.5rem; border: none; border-radius: 12px; width: 300px; font-weight: bold; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s; }
         .btn-host { background: var(--accent); box-shadow: 0 4px 15px rgba(37,99,235,0.4); }
         .btn-remote { background: var(--green); box-shadow: 0 4px 15px rgba(16,185,129,0.4); }
         .btn-xl:active { transform: scale(0.98); }
@@ -108,7 +101,7 @@
             display: none; z-index: 9000;
             display: flex; align-items: center; justify-content: center; gap: 20px;
         }
-        .share-link { color: var(--green); font-family: monospace; font-size: 1.1rem; border-bottom: 1px dashed var(--green); cursor: pointer; }
+        .share-link { color: var(--green); font-family: monospace; font-size: 1.1rem; border-bottom: 1px dashed var(--green); cursor: pointer; transition: color 0.3s; }
 
         /* 4. REMOTE */
         #view-remote-login, #view-remote { align-items: center; justify-content: center; padding: 20px; }
@@ -130,8 +123,11 @@
 
     <div id="view-landing" class="view active">
         <h1 style="font-size:3rem; margin-bottom:40px;">OSCE Manager</h1>
-        <button class="btn-xl btn-host" onclick="initHost()">💻 START AS HOST</button>
-        <button class="btn-xl btn-remote" onclick="initRemote()">📱 START AS REMOTE</button>
+        <div class="landing-btn-group">
+            <button class="btn-xl btn-host" onclick="initHost()">💻 START AS HOST</button>
+            <button class="btn-xl btn-remote" onclick="initRemote()">📱 START AS REMOTE</button>
+        </div>
+        
         <div id="viewer-msg" style="display:none; text-align:center;">
             <p id="viewer-txt" style="color:#aaa; font-size:1.2rem; margin-bottom:20px;">Connecting to Session...</p>
             <button id="force-load-btn" onclick="forceViewerLoad()" style="display:none; padding:10px 20px; background:#444; color:white; border:none; border-radius:6px; cursor:pointer;">Force Load Dashboard</button>
@@ -187,7 +183,7 @@
         <span style="color:#aaa;">Session ID:</span>
         <span id="code-display" style="color:white; font-weight:bold; font-size:1.5rem; letter-spacing:1px;">----</span>
         <div style="width:1px; height:25px; background:#444;"></div>
-        <span class="share-link" onclick="copyLink()">📋 Copy Viewer Link</span>
+        <span class="share-link" id="btn-copy-link" onclick="copyLink()">📋 Copy Viewer Link</span>
     </div>
 
     <div id="view-remote-login" class="view">
@@ -234,12 +230,13 @@
                 isHost = false;
                 examID = joinID;
                 document.getElementById('viewer-msg').style.display = 'block';
-                document.querySelector('.btn-host').style.display = 'none';
-                document.querySelector('.btn-remote').style.display = 'none';
+                document.querySelector('.landing-btn-group').style.display = 'none';
+                
                 setTimeout(() => {
                     document.getElementById('force-load-btn').style.display = 'inline-block';
                     document.getElementById('viewer-txt').innerText = "Taking too long?";
                 }, 5000);
+
                 connectMQTT(joinID);
             }
         };
@@ -254,10 +251,15 @@
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             if(id==='view-run') document.getElementById('view-run').style.display='grid';
+            
+            // HIDE SHARE BAR ON REMOTE
+            if(id==='view-remote' || id==='view-remote-login') {
+                document.getElementById('host-share-bar').style.display = 'none';
+            }
         }
 
         function initHost() { isHost = true; examID = Math.floor(100000 + Math.random() * 900000).toString(); switchView('view-setup'); document.getElementById('host-share-bar').style.display = 'flex'; document.getElementById('code-display').innerText = examID; connectMQTT(examID); }
-        function initRemote() { isHost = false; switchView('view-remote-login'); }
+        function initRemote() { isHost = false; switchView('view-remote-login'); document.getElementById('host-share-bar').style.display = 'none'; }
         function connectRemote() { examID = document.getElementById('remote-code-input').value; connectMQTT(examID); }
         function getSeconds(valId, unitId) { const val = parseFloat(document.getElementById(valId).value)||0; return document.getElementById(unitId).value==='min'?val*60:val; }
 
@@ -358,7 +360,6 @@
             }
             const timeStr = `${m}:${s}`;
             
-            // UPDATE CORRECT TIMER (HOST OR REMOTE)
             if(document.getElementById('view-remote').classList.contains('active')) {
                 document.getElementById('rem-time').innerText = timeStr;
             } else {
@@ -414,10 +415,8 @@
                     return;
                 }
                 targetTime = d.target; isPaused = d.paused; pauseTimeLeft = d.ptl;
-                // Update Remote/Viewer UI
                 if(document.getElementById('view-remote').classList.contains('active')) {
                     document.getElementById('rem-lbl').innerText = d.lbl; document.getElementById('rem-sub').innerText = d.sub;
-                    // FIX COLOR VAR LOOKUP
                     const colorName = d.col.replace('mode-','').replace('main-stage','').trim();
                     document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+colorName+'-color');
                 } else {
@@ -450,7 +449,20 @@
             const m = new Paho.MQTT.Message(JSON.stringify(msg)); m.destinationName = `osce/${examID}/state`; m.retained = true; client.send(m);
         }
         function sendCmd(act) { if(!client || !client.isConnected()) return; const m = new Paho.MQTT.Message(JSON.stringify({ act })); m.destinationName = `osce/${examID}/cmd`; client.send(m); }
-        function copyLink() { const link = `${window.location.origin}${window.location.pathname}?join=${examID}`; navigator.clipboard.writeText(link); alert("Viewer Link Copied!"); }
+        
+        function copyLink() { 
+            const link = `${window.location.origin}${window.location.pathname}?join=${examID}`; 
+            navigator.clipboard.writeText(link); 
+            const btn = document.getElementById('btn-copy-link');
+            const originalText = btn.innerText;
+            btn.innerText = "COPIED!";
+            btn.style.color = "var(--green)";
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.color = "var(--green)";
+            }, 2000);
+        }
+        
         function playBeep(f,d) { if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); try{const o=audioCtx.createOscillator();const g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=f;o.start();g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);o.stop(audioCtx.currentTime+d);}catch(e){} }
         async function togglePiP() {
             if (!window.documentPictureInPicture) return alert("Use Chrome/Edge.");
