@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Full Restore)</title>
+    <title>OSCE Master (Final Restore)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         /* --- ORIGINAL PALETTE & VARIABLES --- */
@@ -58,8 +58,9 @@
 
         .main-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; transition: background 0.5s; position: relative; }
         
-        /* Elements to Move to PiP */
+        /* Elements to Move to PiP (Wrapper) */
         #stage-content { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
+        
         #status-text { font-size: 5vw; font-weight: 800; text-transform: uppercase; margin: 0; line-height: 1; text-shadow: 0 4px 20px rgba(0,0,0,0.3); }
         #timer { font-size: 15vw; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; margin: 20px 0; }
         #info-bar { font-size: 1.5vw; background: rgba(0,0,0,0.4); padding: 10px 40px; border-radius: 50px; margin-top: 20px; color: rgba(255,255,255,0.9); }
@@ -81,7 +82,7 @@
         
         #host-share-bar { position: absolute; bottom: 0; width: 100%; background: rgba(0,0,0,0.9); padding: 10px; text-align: center; border-top: 1px solid #444; display: none; }
         
-        /* 4. REMOTE */
+        /* 4. REMOTE CONTROLLER */
         #view-remote-login { align-items: center; justify-content: center; padding: 20px; }
         #remote-code-input { font-size: 3rem; width: 200px; text-align: center; margin: 20px 0; background: #333; border: 2px solid #555; color: white; border-radius: 12px; padding: 10px; letter-spacing: 5px; }
         
@@ -147,7 +148,7 @@
             <button id="action-btn" onclick="nextSection()">BEGIN</button>
 
             <div id="host-share-bar">
-                <span style="color:#888;">Code:</span>
+                <span style="color:#888;">Remote/View Code:</span>
                 <span id="link-display" style="color:var(--accent); font-weight:bold; margin:0 10px; cursor:pointer;" onclick="copyLink()">[Click to Copy]</span>
             </div>
         </div>
@@ -185,6 +186,8 @@
         const BROKER = "broker.emqx.io";
         const PORT = 8084;
         let client = null, examID = "", isHost = false, pipWindow = null;
+        
+        // DOM REFERENCES (Captured once, valid everywhere)
         let elStatus, elTimer, elInfo, elStageBg, elActionBtn;
 
         // STATE
@@ -200,6 +203,7 @@
             elStageBg = document.getElementById('main-stage-bg');
             elActionBtn = document.getElementById('action-btn');
 
+            // Check if joining via Link
             const params = new URLSearchParams(window.location.search);
             const joinID = params.get('join');
             if(joinID) {
@@ -218,9 +222,11 @@
             if(id==='view-run') document.getElementById('view-run').style.display='grid';
         }
 
+        // --- INIT & SETUP ---
         function initHost() { isHost = true; examID = Math.floor(1000 + Math.random() * 9000).toString(); switchView('view-setup'); connectMQTT(examID); }
         function initRemote() { isHost = false; switchView('view-remote-login'); }
         function connectRemote() { examID = document.getElementById('remote-code-input').value; connectMQTT(examID); }
+        
         function getSeconds(valId, unitId) { const val = parseFloat(document.getElementById(valId).value)||0; return document.getElementById(unitId).value==='min'?val*60:val; }
 
         function analyze() {
@@ -310,10 +316,12 @@
             broadcast();
         }
 
+        // --- TIMER ENGINE ---
         function runStep() {
             if (currentStepIndex >= schedule.length) { finish(); return; }
             const step = schedule[currentStepIndex];
             
+            // Update UI
             elStatus.innerText = step.label;
             elInfo.innerText = step.sub;
             const colorClass = 'main-stage ' + step.colorClass;
@@ -322,6 +330,7 @@
 
             updateSidebars(step);
 
+            // Handle Manual Stops
             if(step.phase === 'WAIT' || step.phase === 'PAUSE') {
                 clearInterval(timerInterval);
                 elTimer.innerText = "--:--";
@@ -332,6 +341,7 @@
                 return;
             }
 
+            // Running
             elActionBtn.style.display = 'none';
             timeLeft = Math.floor(step.duration);
             updateTimerDisplay();
@@ -373,7 +383,7 @@
             } catch(e){}
         }
 
-        // --- STUDENT LIST LOGIC ---
+        // --- STUDENT LIST LOGIC (Restored) ---
         function updateSidebars(step) {
             let cur = [], nxt = [];
             const getSlice = (arr, i) => arr.slice(i*capacity, (i*capacity)+capacity);
@@ -386,7 +396,6 @@
                 if(type === 'ET') cur = getSlice(etStudents, idx);
                 else cur = getSlice(stdStudents, idx);
                 
-                // Determine next
                 const etF = Math.ceil(etStudents.length/capacity);
                 const stdF = Math.ceil(stdStudents.length/capacity);
                 
@@ -401,8 +410,8 @@
                 document.getElementById('lbl-left').innerText = "Current";
                 if(step.type === 'ET') cur = getSlice(etStudents, step.flightIndex);
                 else cur = getSlice(stdStudents, step.flightIndex);
-                // Simple placeholder for next logic during run
-                nxt = []; // Clear next during run to avoid confusion or add complex calc if needed
+                // During a flight, "Next" is usually empty or could be calculated
+                nxt = []; 
             }
             renderStudentList('list-current', cur);
             renderStudentList('list-next', nxt);
@@ -421,41 +430,51 @@
             });
         }
 
-        // --- NETWORK ---
+        // --- CONNECTIVITY ---
         function connectMQTT(id) {
-            const clientId = (isHost?"host_":"rem_") + Math.random().toString(16).substr(2,8);
+            const clientId = (isHost?"host_":"conn_") + Math.random().toString(16).substr(2,8);
             client = new Paho.MQTT.Client(BROKER, PORT, "/mqtt", clientId);
             
             client.onMessageArrived = (msg) => {
                 const d = JSON.parse(msg.payloadString);
+                
+                // 1. HOST LOGIC (Receiving Commands)
                 if(isHost) {
                     if(d.act === 'CLICK' && elActionBtn.style.display !== 'none') nextSection();
                     if(d.act === 'PAUSE') { isPaused = !isPaused; broadcast(); }
-                } else {
-                    // REMOTE OR VIEWER
-                    if(document.getElementById('view-remote').classList.contains('active')) {
-                        document.getElementById('rem-lbl').innerText = d.lbl;
-                        document.getElementById('rem-time').innerText = d.time;
-                        document.getElementById('rem-sub').innerText = d.sub;
-                        document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+d.col.replace('main-stage mode-','')+'-color'); 
-                        // Note: The color mapping above is a quick hack, normally send hex or ensure mapping exists
-                    } else if (document.getElementById('view-run').classList.contains('active')) {
-                        // VIEWER MODE
-                        elStatus.innerText = d.lbl; elTimer.innerText = d.time; elInfo.innerText = d.sub;
-                        const colClass = 'main-stage ' + d.col;
-                        elStageBg.className = colClass;
-                        if(pipWindow) pipWindow.document.body.className = colClass;
-                    }
+                    return;
+                }
+
+                // 2. REMOTE LOGIC (Receiving Status)
+                if(document.getElementById('view-remote').classList.contains('active')) {
+                    document.getElementById('rem-lbl').innerText = d.lbl;
+                    document.getElementById('rem-time').innerText = d.time;
+                    document.getElementById('rem-sub').innerText = d.sub;
+                    // Simple color sync for remote
+                    document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+d.col.replace('main-stage mode-','')+'-color'); 
+                } 
+                
+                // 3. VIEWER LOGIC (Mirroring Host)
+                else {
+                    elStatus.innerText = d.lbl; 
+                    elTimer.innerText = d.time; 
+                    elInfo.innerText = d.sub;
+                    const colClass = 'main-stage ' + d.col;
+                    elStageBg.className = colClass;
+                    if(pipWindow) pipWindow.document.body.className = colClass;
                 }
             };
 
             client.connect({
                 useSSL: true,
                 onSuccess: () => {
-                    if(isHost) client.subscribe(`osce/${id}/cmd`);
-                    else {
+                    if(isHost) {
+                        client.subscribe(`osce/${id}/cmd`);
+                    } else {
                         client.subscribe(`osce/${id}/state`);
-                        if(document.getElementById('view-remote-login').classList.contains('active')) switchView('view-remote');
+                        // Logic to switch view based on where we started
+                        const isLogin = document.getElementById('view-remote-login').classList.contains('active');
+                        if(isLogin) switchView('view-remote');
                         else if(!isHost && !document.getElementById('view-landing').classList.contains('active')) switchView('view-run');
                     }
                 }
@@ -476,17 +495,25 @@
             navigator.clipboard.writeText(link); alert("Link Copied!");
         }
 
-        // --- POP OUT ---
+        // --- POP OUT LOGIC (DOM MOVE METHOD) ---
         async function togglePiP() {
             if (!window.documentPictureInPicture) return alert("Use Chrome/Edge.");
             if (pipWindow) { pipWindow.close(); return; }
             pipWindow = await window.documentPictureInPicture.requestWindow({ width: 500, height: 350 });
+            
+            // 1. Copy Styles
             [...document.head.querySelectorAll('style, link')].forEach(el => pipWindow.document.head.appendChild(el.cloneNode(true)));
             
+            // 2. Setup Window Body
             const body = pipWindow.document.body;
-            body.className = elStageBg.className; body.style.display="flex"; body.style.alignItems="center"; body.style.justifyContent="center"; body.style.height="100vh";
+            body.className = elStageBg.className; 
+            body.style.display="flex"; body.style.alignItems="center"; body.style.justifyContent="center"; body.style.height="100vh";
+            
+            // 3. MOVE CONTENT (The Secret to Smoothness)
             const content = document.getElementById('stage-content');
             body.append(content);
+
+            // 4. Handle Close
             pipWindow.addEventListener('pagehide', () => {
                 elStageBg.insertBefore(content, elActionBtn);
                 pipWindow = null;
