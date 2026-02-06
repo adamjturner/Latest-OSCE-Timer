@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Connection Fix)</title>
+    <title>OSCE Master (Stable Core)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
-        /* --- CORE VARIABLES --- */
         :root {
             --bg: #121212; --surf: #1e1e1e; --text: #ffffff;
             --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444;
+            /* Logic Colors */
             --prep-color: #d97706; --station-color: #059669; --move-color: #2563eb;
             --ready-color: #374151; --standby-color: #0f172a; --stop-color: #b91c1c;
             --intermission-color: #111; --extra-prep: #7c2d12; --extra-station: #064e3b;
@@ -19,11 +19,10 @@
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-        /* VIEWS */
         .view { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; flex-direction: column; }
         .view.active { display: flex; }
 
-        /* STATUS INDICATOR (NEW) */
+        /* STATUS INDICATOR */
         #conn-status {
             position: fixed; top: 10px; left: 10px; z-index: 9999;
             background: rgba(0,0,0,0.8); padding: 5px 12px; border-radius: 20px;
@@ -116,7 +115,7 @@
 
     <div id="view-setup" class="view">
         <div class="card">
-            <h2>Student Data (Paste Excel/Table)</h2>
+            <h2>Student Data</h2>
             <textarea id="paste-area" placeholder="Example:&#10;Noah    Red&#10;Nargis  Green&#10;John    Blue"></textarea>
             <button class="btn-full" style="background:#4b5563; width:auto; padding:10px 20px; font-size:1rem;" onclick="analyze()">Analyze & Group</button>
             <span id="analysis-summary" style="color:#aaa; margin-left:10px;"></span>
@@ -145,13 +144,11 @@
             <div id="top-right-tools">
                 <button class="tool-btn" onclick="togglePiP()">📺 Pop Out</button>
             </div>
-
             <div id="stage-content">
                 <div id="status-text">WELCOME</div>
                 <div id="timer">--:--</div>
-                <div id="info-bar">WAITING FOR HOST TO START...</div>
+                <div id="info-bar">WAITING FOR HOST...</div>
             </div>
-
             <button id="action-btn" onclick="nextSection()">BEGIN</button>
         </div>
 
@@ -191,16 +188,23 @@
     </div>
 
     <script>
-        // --- CONFIG ---
+        // --- CORE CONFIG (From Shared Timer v15) ---
         const BROKER = "broker.emqx.io";
         const PORT = 8084;
         let client = null, examID = "", isHost = false, pipWindow = null;
-        let elStatus, elTimer, elInfo, elStageBg, elActionBtn;
         
+        // Timer Variables
+        let targetTime = null; 
+        let isPaused = false;
+        let pauseTimeLeft = 0; // If paused, store how many seconds remained
+
+        // UI & Logic
         let etStudents = [], stdStudents = [], schedule = [], currentStepIndex = 0;
-        let timerInterval = null, timeLeft = 0, isPaused = false;
         let capacity = 12;
         let audioCtx = null;
+        
+        // Dom Refs
+        let elStatus, elTimer, elInfo, elStageBg, elActionBtn;
 
         window.onload = () => {
             elStatus = document.getElementById('status-text');
@@ -209,7 +213,7 @@
             elStageBg = document.getElementById('main-stage-bg');
             elActionBtn = document.getElementById('action-btn');
 
-            // URL Params Check
+            // URL Param Check
             const params = new URLSearchParams(window.location.search);
             const joinID = params.get('join');
             if(joinID) {
@@ -225,15 +229,8 @@
         function setStatus(connected, msg) {
             const ind = document.getElementById('conn-status');
             const txt = document.getElementById('conn-text');
-            if(connected) {
-                ind.classList.add('conn-active');
-                txt.innerText = "Online";
-                txt.style.color = "var(--green)";
-            } else {
-                ind.classList.remove('conn-active');
-                txt.innerText = msg || "Offline";
-                txt.style.color = "var(--red)";
-            }
+            if(connected) { ind.classList.add('conn-active'); txt.innerText = "Online"; txt.style.color = "var(--green)"; }
+            else { ind.classList.remove('conn-active'); txt.innerText = msg||"Offline"; txt.style.color = "var(--red)"; }
         }
 
         function switchView(id) {
@@ -242,10 +239,10 @@
             if(id==='view-run') document.getElementById('view-run').style.display='grid';
         }
 
-        // --- HOST & SETUP ---
+        // --- HOST LOGIC ---
         function initHost() { 
             isHost = true; 
-            examID = Math.floor(1000 + Math.random() * 9000).toString(); 
+            examID = Math.floor(100000 + Math.random() * 900000).toString(); 
             switchView('view-setup'); 
             document.getElementById('host-share-bar').style.display = 'flex';
             document.getElementById('code-display').innerText = examID;
@@ -268,14 +265,11 @@
                 const tokens = line.replace(/\r/g, '').split('\t').map(t => t.trim());
                 if (tokens.join('').length === 0) return;
                 let group = "Unknown", groupIndex = -1;
-                for (let i = tokens.length - 1; i >= 0; i--) {
-                    if (colorTriggers.some(c => tokens[i].toLowerCase().includes(c))) { group = tokens[i]; groupIndex = i; break; }
-                }
+                for (let i = tokens.length - 1; i >= 0; i--) { if (colorTriggers.some(c => tokens[i].toLowerCase().includes(c))) { group = tokens[i]; groupIndex = i; break; } }
                 let isExtra = false, nameStart = 0;
                 const first = tokens[0].toLowerCase();
                 if (etTriggers.includes(first) || first.startsWith('25%')) { isExtra = true; nameStart = 1; }
                 else if (first === "") { isExtra = false; nameStart = 1; }
-
                 const nameEnd = (groupIndex > -1) ? groupIndex : tokens.length;
                 const name = tokens.slice(nameStart, nameEnd).filter(n => n).join(' ');
                 const obj = { name: name || "Student", group: group };
@@ -296,7 +290,6 @@
 
             schedule = [];
             schedule.push({ type:'STANDBY', phase:'WAIT', duration:0, label:'WELCOME', sub:'PLEASE WAIT', colorClass:'mode-standby', nextType:(etStudents.length>0)?'ET':'STD', nextIdx:0 });
-
             if(leadIn > 0) schedule.push({ type:'LEAD_IN', phase:'READY', duration:leadIn, label:'GET READY', sub:'STARTING...', colorClass:'mode-ready', nextType:(etStudents.length>0)?'ET':'STD', nextIdx:0 });
 
             const createFlight = (type, idx) => {
@@ -324,61 +317,91 @@
             switchView('view-run');
             currentStepIndex = 0;
             runStep();
-            broadcast();
         }
 
+        // --- NEW TIMER ENGINE (Based on Shared Timer v15) ---
         function runStep() {
             if (currentStepIndex >= schedule.length) { finish(); return; }
             const step = schedule[currentStepIndex];
+            
+            // UI Update
             elStatus.innerText = step.label; elInfo.innerText = step.sub;
-            const colorClass = 'main-stage ' + step.colorClass;
-            elStageBg.className = colorClass;
-            if (pipWindow) pipWindow.document.body.className = colorClass;
+            elStageBg.className = 'main-stage ' + step.colorClass;
+            if(pipWindow) pipWindow.document.body.className = 'main-stage ' + step.colorClass;
             updateSidebars(step);
 
+            // Manual Phase (Waiting for click)
             if(step.phase === 'WAIT' || step.phase === 'PAUSE') {
-                clearInterval(timerInterval);
+                targetTime = null; // No target
                 elTimer.innerText = "--:--";
                 elActionBtn.style.display = 'inline-block';
                 elActionBtn.innerText = (step.phase === 'WAIT') ? "BEGIN EXAM" : "START FLIGHT";
                 if(step.phase === 'PAUSE') playBeep(600, 0.5);
-                broadcast();
+                broadcastState(); // Send empty target
                 return;
             }
+
+            // Auto Phase (Counting down)
             elActionBtn.style.display = 'none';
-            timeLeft = Math.floor(step.duration);
-            updateTimerDisplay();
-            if(step.phase === 'STATION') playBeep(800, 0.5); else if(step.phase === 'PREP') playBeep(440, 0.5);
-
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                if(!isPaused) {
-                    timeLeft--;
-                    updateTimerDisplay();
-                    if(timeLeft%2===0 && isHost) broadcast();
-                    if (timeLeft < 0) { currentStepIndex++; runStep(); }
-                }
-            }, 1000);
-            broadcast();
+            // Set Target (Current Time + Duration)
+            targetTime = Date.now() + (step.duration * 1000);
+            isPaused = false;
+            
+            if(step.phase === 'STATION') playBeep(800, 0.5); 
+            else if(step.phase === 'PREP') playBeep(440, 0.5);
+            
+            broadcastState(); // Send the future target
         }
 
-        function updateTimerDisplay() {
-            const m = Math.floor(timeLeft / 60).toString().padStart(2,'0');
-            const s = (timeLeft % 60).toString().padStart(2,'0');
-            elTimer.innerText = `${m}:${s}`;
-        }
         function nextSection() { currentStepIndex++; runStep(); }
+        
+        function togglePause() {
+            isPaused = !isPaused;
+            if(isPaused) {
+                // Calc remaining
+                pauseTimeLeft = targetTime - Date.now();
+                targetTime = null; // Stop the clock
+            } else {
+                // Resume
+                targetTime = Date.now() + pauseTimeLeft;
+            }
+            broadcastState();
+        }
+
+        // --- THE TICK LOOP (Runs on all clients independent of network) ---
+        setInterval(() => {
+            if (targetTime) {
+                const diff = targetTime - Date.now();
+                if (diff <= 0) {
+                    elTimer.innerText = "00:00";
+                    if (isHost && currentStepIndex < schedule.length) { 
+                        // Only Host triggers next step
+                        targetTime = null; // Stop double trigger
+                        nextSection(); 
+                    }
+                } else {
+                    const m = Math.floor(diff / 60000).toString().padStart(2, '0');
+                    const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+                    elTimer.innerText = `${m}:${s}`;
+                }
+            } else {
+                 if(isPaused && pauseTimeLeft > 0) {
+                    const m = Math.floor(pauseTimeLeft / 60000).toString().padStart(2, '0');
+                    const s = Math.floor((pauseTimeLeft % 60000) / 1000).toString().padStart(2, '0');
+                    elTimer.innerText = `${m}:${s}`;
+                 }
+            }
+        }, 100);
+
         function finish() {
-            clearInterval(timerInterval); elStatus.innerText = "DONE"; elTimer.innerText = "00:00";
+            targetTime = null;
+            elStatus.innerText = "DONE"; elTimer.innerText = "00:00"; 
             elStageBg.className = 'main-stage mode-done';
             if(pipWindow) pipWindow.document.body.className = 'main-stage mode-done';
-            broadcast();
-        }
-        function playBeep(f, d) {
-            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            try { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.connect(g); g.connect(audioCtx.destination); o.frequency.value = f; o.start(); g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d); o.stop(audioCtx.currentTime + d); } catch(e){}
+            broadcastState();
         }
 
+        // --- SIDEBARS ---
         function updateSidebars(step) {
             let cur = [], nxt = [];
             const getSlice = (arr, i) => arr.slice(i*capacity, (i*capacity)+capacity);
@@ -386,8 +409,7 @@
                 document.getElementById('lbl-left').innerText = "Get Ready";
                 const type = step.nextType; const idx = step.nextIdx;
                 cur = (type === 'ET') ? getSlice(etStudents, idx) : getSlice(stdStudents, idx);
-                const etF = Math.ceil(etStudents.length/capacity);
-                const stdF = Math.ceil(stdStudents.length/capacity);
+                const etF = Math.ceil(etStudents.length/capacity); const stdF = Math.ceil(stdStudents.length/capacity);
                 if(type === 'ET') { nxt = (idx+1 < etF) ? getSlice(etStudents, idx+1) : (stdStudents.length > 0 ? getSlice(stdStudents, 0) : []); }
                 else { nxt = (idx+1 < stdF) ? getSlice(stdStudents, idx+1) : []; }
             } else {
@@ -412,24 +434,38 @@
             });
         }
 
+        // --- NETWORK (SHARED TIMER LOGIC) ---
         function connectMQTT(id) {
             setStatus(false, "Connecting...");
             const clientId = (isHost?"host_":"conn_") + Math.random().toString(16).substr(2,8);
             client = new Paho.MQTT.Client(BROKER, PORT, "/mqtt", clientId);
             
             client.onConnectionLost = (o) => { setStatus(false, "Lost Connection"); console.log(o); };
+            
             client.onMessageArrived = (msg) => {
                 const d = JSON.parse(msg.payloadString);
+                
+                // HOST RECEIVES COMMANDS
                 if(isHost) {
                     if(d.act === 'CLICK' && elActionBtn.style.display !== 'none') nextSection();
-                    if(d.act === 'PAUSE') { isPaused = !isPaused; broadcast(); }
+                    if(d.act === 'PAUSE') togglePause();
                     return;
                 }
+
+                // VIEWERS RECEIVE STATE
+                // 1. Sync Timer Target
+                targetTime = d.target;
+                isPaused = d.paused;
+                pauseTimeLeft = d.ptl;
+
+                // 2. Sync UI
                 if(document.getElementById('view-remote').classList.contains('active')) {
-                    document.getElementById('rem-lbl').innerText = d.lbl; document.getElementById('rem-time').innerText = d.time; document.getElementById('rem-sub').innerText = d.sub;
-                    document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+d.col.replace('main-stage mode-','')+'-color'); 
+                    document.getElementById('rem-lbl').innerText = d.lbl; 
+                    document.getElementById('rem-sub').innerText = d.sub;
+                    document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+d.col.replace('main-stage mode-','')+'-color');
                 } else {
-                    elStatus.innerText = d.lbl; elTimer.innerText = d.time; elInfo.innerText = d.sub;
+                    elStatus.innerText = d.lbl; 
+                    elInfo.innerText = d.sub;
                     const colClass = 'main-stage ' + d.col;
                     elStageBg.className = colClass;
                     if(pipWindow) pipWindow.document.body.className = colClass;
@@ -440,23 +476,31 @@
                 useSSL: true,
                 onSuccess: () => {
                     setStatus(true, "Online");
-                    if(isHost) { client.subscribe(`osce/${id}/cmd`); } 
-                    else { 
+                    if(isHost) { 
+                        client.subscribe(`osce/${id}/cmd`); 
+                    } else { 
                         client.subscribe(`osce/${id}/state`);
-                        const isLogin = document.getElementById('view-remote-login').classList.contains('active');
-                        if(isLogin) switchView('view-remote');
+                        if(document.getElementById('view-remote-login').classList.contains('active')) switchView('view-remote');
                         else if(!isHost && !document.getElementById('view-landing').classList.contains('active')) switchView('view-run');
                     }
                 },
-                onFailure: (e) => { setStatus(false, "Blocked/Failed"); alert("Connection Failed. Check Firewall."); }
+                onFailure: () => { setStatus(false, "Blocked/Failed"); alert("Network Blocked. Try Hotspot."); }
             });
         }
 
-        function broadcast() {
+        function broadcastState() {
             if(!isHost || !client || !client.isConnected()) return;
-            const msg = { lbl: elStatus.innerText, time: elTimer.innerText, sub: elInfo.innerText, col: elStageBg.className.split(' ').pop() };
+            const msg = { 
+                target: targetTime,
+                paused: isPaused,
+                ptl: pauseTimeLeft,
+                lbl: elStatus.innerText, 
+                sub: elInfo.innerText, 
+                col: elStageBg.className.split(' ').pop() 
+            };
             const m = new Paho.MQTT.Message(JSON.stringify(msg)); m.destinationName = `osce/${examID}/state`; m.retained = true; client.send(m);
         }
+
         function sendCmd(act) {
             if(!client || !client.isConnected()) return;
             const m = new Paho.MQTT.Message(JSON.stringify({ act })); m.destinationName = `osce/${examID}/cmd`; client.send(m);
@@ -465,6 +509,7 @@
             const link = `${window.location.origin}${window.location.pathname}?join=${examID}`;
             navigator.clipboard.writeText(link); alert("Viewer Link Copied!");
         }
+        function playBeep(f,d) { if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); try{const o=audioCtx.createOscillator();const g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=f;o.start();g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);o.stop(audioCtx.currentTime+d);}catch(e){} }
 
         async function togglePiP() {
             if (!window.documentPictureInPicture) return alert("Use Chrome/Edge.");
@@ -475,10 +520,7 @@
             body.className = elStageBg.className; body.style.display="flex"; body.style.alignItems="center"; body.style.justifyContent="center"; body.style.height="100vh";
             const content = document.getElementById('stage-content');
             body.append(content);
-            pipWindow.addEventListener('pagehide', () => {
-                elStageBg.insertBefore(content, elActionBtn);
-                pipWindow = null;
-            });
+            pipWindow.addEventListener('pagehide', () => { elStageBg.insertBefore(content, elActionBtn); pipWindow = null; });
         }
     </script>
 </body>
