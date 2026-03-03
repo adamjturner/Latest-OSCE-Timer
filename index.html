@@ -17,7 +17,7 @@
         }
 
         * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; position: relative; }
 
         .view { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; flex-direction: column; }
         .view.active { display: flex; }
@@ -44,6 +44,9 @@
         .btn-remote { background: var(--purple); box-shadow: 0 4px 15px rgba(139,92,246,0.4); }
         .btn-viewer { background: var(--amber); box-shadow: 0 4px 15px rgba(245,158,11,0.4); color: #000; }
         .btn-xl:active { transform: scale(0.98); }
+        
+        /* VERSION STAMP */
+        #version-stamp { position: absolute; bottom: 15px; width: 100%; text-align: center; color: #555; font-size: 0.75rem; letter-spacing: 1px; text-transform: uppercase; }
 
         /* 2. SETUP */
         #view-setup { padding: 40px; max-width: 900px; margin: 0 auto; width: 100%; overflow-y: auto; padding-bottom: 80px; }
@@ -133,6 +136,8 @@
             <p id="viewer-txt" style="color:#aaa; font-size:1.2rem; margin-bottom:20px;">Connecting to Session...</p>
             <button id="force-load-btn" onclick="forceViewerLoad()" style="display:none; padding:10px 20px; background:#444; color:white; border:none; border-radius:6px; cursor:pointer;">Force Load Dashboard</button>
         </div>
+        
+        <div id="version-stamp">VERSION 3.0 | UPDATED: MAR 3, 2026 12:33 PM</div>
     </div>
 
     <div id="view-setup" class="view">
@@ -232,7 +237,9 @@
         let etStudents = [], stdStudents = [], schedule = [], currentStepIndex = 0;
         let etQueue = [], stdQueue = [], activeFlightStudents = [], flightCounter = 1;
         let capacity = 12; let audioCtx = null;
-        let elStatus, elTimer, elInfo, elStageBg, elActionBtn;
+        
+        // DOM ELEMENTS CACHED TO SURVIVE PiP EXTRACTION
+        let elStatus, elTimer, elInfo, elStageBg, elActionBtn, elDynCapContainer, elDynCapInput;
 
         window.onload = () => {
             elStatus = document.getElementById('status-text');
@@ -240,6 +247,10 @@
             elInfo = document.getElementById('info-bar');
             elStageBg = document.getElementById('main-stage-bg');
             elActionBtn = document.getElementById('action-btn');
+            
+            // Caching these is critical so they don't break when moved to the PiP window!
+            elDynCapContainer = document.getElementById('dynamic-capacity-container');
+            elDynCapInput = document.getElementById('dyn-capacity');
         };
 
         function forceViewerLoad() { switchView('view-run'); }
@@ -264,7 +275,7 @@
             document.getElementById(id).classList.add('active');
             if(id === 'view-run') document.getElementById('view-run').style.display='grid';
             
-            // Show the top center code & connection dot for Setup and Run phases (for Host and Viewers)
+            // Show the top center code & connection dot for Setup and Run phases
             if(id === 'view-setup' || id === 'view-run') {
                 document.getElementById('host-code-display').style.display = 'block';
             } else {
@@ -275,9 +286,9 @@
         // --- INITIATION FUNCTIONS ---
         function initHost() { 
             isHost = true; 
-            examID = Math.floor(1000 + Math.random() * 9000).toString(); // Changed to 4 digits
+            examID = Math.floor(1000 + Math.random() * 9000).toString(); // 4 Digits
             document.getElementById('code-val').innerText = examID; 
-            document.getElementById('pip-btn').style.display = 'none'; // Hide pop out button for the Host
+            document.getElementById('pip-btn').style.display = 'none'; // Hide pop out button for Host
             switchView('view-setup'); 
             connectMQTT(examID); 
         }
@@ -344,12 +355,11 @@
         function startExam() {
             if(etStudents.length===0 && stdStudents.length===0) analyze();
             
-            // Queue Initialization
             etQueue = [...etStudents];
             stdQueue = [...stdStudents];
             flightCounter = 1;
 
-            document.getElementById('dyn-capacity').value = capacity;
+            elDynCapInput.value = capacity;
             schedule = [{ type: 'STANDBY', phase: 'WAIT', duration: 0, label: 'WELCOME', sub: 'WAITING TO START', colorClass: 'mode-standby' }];
 
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -358,7 +368,7 @@
 
         // --- DYNAMIC FLIGHT BUILDER ---
         function buildNextFlightSteps() {
-            let cap = parseInt(document.getElementById('dyn-capacity').value) || capacity;
+            let cap = parseInt(elDynCapInput.value) || capacity;
             if (etQueue.length === 0 && stdQueue.length === 0) return false;
 
             let isET = etQueue.length > 0;
@@ -402,25 +412,23 @@
             if (pipWindow) pipWindow.document.body.className = colorClass;
             
             updateSidebars(step);
-            
-            const dynCapContainer = document.getElementById('dynamic-capacity-container');
 
             if(step.phase === 'WAIT' || step.phase === 'PAUSE') {
                 targetTime = null; elTimer.innerText = "--:--";
                 if (isHost) {
                     elActionBtn.style.display = 'inline-block'; 
                     elActionBtn.innerText = (step.phase === 'WAIT') ? "BEGIN EXAM" : "START FLIGHT";
-                    dynCapContainer.style.display = 'block';
+                    elDynCapContainer.style.display = 'block';
                 } else {
                     elActionBtn.style.display = 'none';
-                    dynCapContainer.style.display = 'none';
+                    elDynCapContainer.style.display = 'none';
                 }
                 if(step.phase === 'PAUSE') playBeep(600, 0.5);
                 broadcastState(); return;
             }
             
             elActionBtn.style.display = 'none'; 
-            dynCapContainer.style.display = 'none';
+            elDynCapContainer.style.display = 'none';
             targetTime = Date.now() + (step.duration * 1000); 
             isPaused = false;
             
@@ -468,7 +476,7 @@
             }
         }, 100);
 
-        function finish() { targetTime = null; elStatus.innerText = "DONE"; elTimer.innerText = "00:00"; elStageBg.className = 'main-stage mode-done'; if(pipWindow) pipWindow.document.body.className = 'main-stage mode-done'; broadcastState(); elActionBtn.style.display = 'none'; document.getElementById('dynamic-capacity-container').style.display = 'none'; }
+        function finish() { targetTime = null; elStatus.innerText = "DONE"; elTimer.innerText = "00:00"; elStageBg.className = 'main-stage mode-done'; if(pipWindow) pipWindow.document.body.className = 'main-stage mode-done'; broadcastState(); elActionBtn.style.display = 'none'; elDynCapContainer.style.display = 'none'; }
 
         // --- SIDEBAR & QUEUE RENDER ---
         function getPeekQueues(cap) {
@@ -491,7 +499,7 @@
 
         function updateSidebars(step) {
             if(!step) return;
-            let cap = parseInt(document.getElementById('dyn-capacity').value) || capacity;
+            let cap = parseInt(elDynCapInput.value) || capacity;
             let current = [], next = [];
             let isPausable = (step.phase === 'PAUSE' || step.phase === 'WAIT');
 
@@ -543,7 +551,6 @@
             client.onMessageArrived = (msg) => {
                 const d = JSON.parse(msg.payloadString);
                 
-                // HOST COMMAND PROCESSING
                 if(isHost) {
                     if(msg.destinationName.endsWith('/cmd')) {
                         if(d.act === 'CLICK' && elActionBtn.style.display !== 'none') nextSection();
@@ -552,7 +559,6 @@
                     return;
                 }
                 
-                // REMOTE / VIEWER STATE PROCESSING
                 if(msg.destinationName.endsWith('/state')) {
                     targetTime = d.target; isPaused = d.paused; pauseTimeLeft = d.ptl;
                     
@@ -566,13 +572,13 @@
                         const colClass = 'main-stage ' + d.col; elStageBg.className = colClass;
                         if(pipWindow) pipWindow.document.body.className = colClass;
                         
-                        // SYNC VIEWER SIDEBARS (Cleanly injected from Host)
                         document.getElementById('list-current').innerHTML = d.sbL;
                         document.getElementById('list-next').innerHTML = d.sbR;
                         document.getElementById('lbl-left').innerText = d.sbLTitle;
                         
-                        elActionBtn.style.display = 'none';
-                        document.getElementById('dynamic-capacity-container').style.display = 'none';
+                        // Using the cached variables prevents the PiP DOM extraction crash
+                        if(elActionBtn) elActionBtn.style.display = 'none';
+                        if(elDynCapContainer) elDynCapContainer.style.display = 'none';
                     }
                 }
             };
@@ -581,7 +587,6 @@
                 useSSL: true,
                 onSuccess: () => {
                     setStatus(true, "Online");
-                    // Apply code to display for Viewer once connected
                     document.getElementById('code-val').innerText = id;
                     
                     if(isHost) { 
@@ -606,7 +611,6 @@
         function broadcastState() {
             if(!isHost || !client || !client.isConnected()) return;
             
-            // Clean sidebar HTML for viewers (strip out the host's skip buttons)
             const cleanLeftHtml = document.getElementById('list-current').innerHTML.replace(/<button[^>]*skip-btn[^>]*>.*?<\/button>/g, '');
             const cleanRightHtml = document.getElementById('list-next').innerHTML.replace(/<button[^>]*skip-btn[^>]*>.*?<\/button>/g, '');
             
