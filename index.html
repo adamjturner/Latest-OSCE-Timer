@@ -9,7 +9,7 @@
         /* --- VARIABLES --- */
         :root {
             --bg: #121212; --surf: #1e1e1e; --text: #ffffff;
-            --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444;
+            --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444; --purple: #8b5cf6;
             --prep-color: #d97706; --station-color: #059669; --move-color: #2563eb;
             --ready-color: #374151; --standby-color: #0f172a; --stop-color: #b91c1c;
             --intermission-color: #111; --extra-prep: #7c2d12; --extra-station: #064e3b;
@@ -35,11 +35,12 @@
 
         /* 1. LANDING (Fixed Layout) */
         #view-landing { align-items: center; justify-content: center; gap: 20px; z-index: 200; background: var(--bg); }
-        .landing-btn-group { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; width: 100%; }
+        .landing-btn-group { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 1000px; }
         
         .btn-xl { padding: 25px 40px; font-size: 1.5rem; border: none; border-radius: 12px; width: 300px; font-weight: bold; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s; }
         .btn-host { background: var(--accent); box-shadow: 0 4px 15px rgba(37,99,235,0.4); }
-        .btn-remote { background: var(--green); box-shadow: 0 4px 15px rgba(16,185,129,0.4); }
+        .btn-remote { background: var(--purple); box-shadow: 0 4px 15px rgba(139,92,246,0.4); }
+        .btn-viewer { background: var(--amber); box-shadow: 0 4px 15px rgba(245,158,11,0.4); }
         .btn-xl:active { transform: scale(0.98); }
 
         /* 2. SETUP */
@@ -103,9 +104,9 @@
         }
         .share-link { color: var(--green); font-family: monospace; font-size: 1.1rem; border-bottom: 1px dashed var(--green); cursor: pointer; transition: color 0.3s; }
 
-        /* 4. REMOTE */
-        #view-remote-login, #view-remote { align-items: center; justify-content: center; padding: 20px; }
-        #remote-code-input { font-size: 3rem; width: 200px; text-align: center; margin: 20px 0; background: #333; border: 2px solid #555; color: white; border-radius: 12px; padding: 10px; letter-spacing: 5px; }
+        /* 4. REMOTE & VIEWER FORMS */
+        #view-remote-passcode, #view-remote-login, #view-viewer-login, #view-remote { align-items: center; justify-content: center; padding: 20px; }
+        .code-input { font-size: 3rem; width: 250px; text-align: center; margin: 20px 0; background: #333; border: 2px solid #555; color: white; border-radius: 12px; padding: 10px; letter-spacing: 5px; }
         
         .rem-grid { display: grid; grid-template-rows: 1fr 2fr 1fr; width: 100%; height: 100%; gap: 15px; max-width: 500px; }
         .rem-status { background: #222; border-radius: 15px; border: 1px solid #333; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: background 0.3s; }
@@ -125,10 +126,11 @@
         <h1 style="font-size:3rem; margin-bottom:40px;">OSCE Manager</h1>
         <div class="landing-btn-group">
             <button class="btn-xl btn-host" onclick="initHost()">💻 START AS HOST</button>
-            <button class="btn-xl btn-remote" onclick="initRemote()">📱 START AS REMOTE</button>
+            <button class="btn-xl btn-remote" onclick="initRemotePasscode()">📱 START AS REMOTE</button>
+            <button class="btn-xl btn-viewer" onclick="initViewerLogin()">👁️ START AS VIEWER</button>
         </div>
         
-        <div id="viewer-msg" style="display:none; text-align:center;">
+        <div id="viewer-msg" style="display:none; text-align:center; margin-top:30px;">
             <p id="viewer-txt" style="color:#aaa; font-size:1.2rem; margin-bottom:20px;">Connecting to Session...</p>
             <button id="force-load-btn" onclick="forceViewerLoad()" style="display:none; padding:10px 20px; background:#444; color:white; border:none; border-radius:6px; cursor:pointer;">Force Load Dashboard</button>
         </div>
@@ -186,11 +188,25 @@
         <span class="share-link" id="btn-copy-link" onclick="copyLink()">📋 Copy Viewer Link</span>
     </div>
 
+    <div id="view-remote-passcode" class="view">
+        <h2>ENTER REMOTE PASSCODE</h2>
+        <input type="password" id="remote-passcode-input" class="code-input" placeholder="****">
+        <button class="btn-xl btn-remote" onclick="checkRemotePasscode()">VERIFY</button>
+        <p id="passcode-msg" style="color:var(--red); margin-top:20px;"></p>
+        <button onclick="location.reload()" style="margin-top:20px; background:none; border:none; color:#888; text-decoration:underline; cursor:pointer;">Back to menu</button>
+    </div>
+
     <div id="view-remote-login" class="view">
         <h2>ENTER EXAM CODE</h2>
-        <input type="number" id="remote-code-input" placeholder="0000">
-        <button class="btn-xl btn-remote" onclick="connectRemote()">CONNECT</button>
-        <p id="rem-msg" style="color:var(--amber); margin-top:20px;"></p>
+        <input type="number" id="remote-code-input" class="code-input" placeholder="000000">
+        <button class="btn-xl btn-remote" onclick="connectRemote()">CONNECT CONTROLLER</button>
+    </div>
+
+    <div id="view-viewer-login" class="view">
+        <h2>ENTER EXAM CODE</h2>
+        <input type="number" id="viewer-code-input" class="code-input" placeholder="000000">
+        <button class="btn-xl btn-viewer" onclick="connectViewer()">WATCH SESSION</button>
+        <button onclick="location.reload()" style="margin-top:20px; background:none; border:none; color:#888; text-decoration:underline; cursor:pointer;">Back to menu</button>
     </div>
 
     <div id="view-remote" class="view">
@@ -252,15 +268,38 @@
             document.getElementById(id).classList.add('active');
             if(id==='view-run') document.getElementById('view-run').style.display='grid';
             
-            // HIDE SHARE BAR ON REMOTE
-            if(id==='view-remote' || id==='view-remote-login') {
+            // HIDE SHARE BAR ON EVERYTHING EXCEPT HOST VIEWS
+            if(id !== 'view-setup' && id !== 'view-run' || !isHost) {
                 document.getElementById('host-share-bar').style.display = 'none';
             }
         }
 
+        // --- INITIATION FUNCTIONS ---
         function initHost() { isHost = true; examID = Math.floor(100000 + Math.random() * 900000).toString(); switchView('view-setup'); document.getElementById('host-share-bar').style.display = 'flex'; document.getElementById('code-display').innerText = examID; connectMQTT(examID); }
-        function initRemote() { isHost = false; switchView('view-remote-login'); document.getElementById('host-share-bar').style.display = 'none'; }
+        
+        function initRemotePasscode() { switchView('view-remote-passcode'); }
+        function checkRemotePasscode() {
+            if(document.getElementById('remote-passcode-input').value === '1724') {
+                document.getElementById('remote-passcode-input').value = '';
+                document.getElementById('passcode-msg').innerText = '';
+                isHost = false;
+                switchView('view-remote-login');
+            } else {
+                document.getElementById('passcode-msg').innerText = 'Incorrect Passcode';
+            }
+        }
         function connectRemote() { examID = document.getElementById('remote-code-input').value; connectMQTT(examID); }
+
+        function initViewerLogin() { switchView('view-viewer-login'); }
+        function connectViewer() { 
+            examID = document.getElementById('viewer-code-input').value; 
+            isHost = false;
+            document.getElementById('viewer-msg').style.display = 'block';
+            document.querySelector('.landing-btn-group').style.display = 'none';
+            switchView('view-landing'); 
+            connectMQTT(examID); 
+        }
+
         function getSeconds(valId, unitId) { const val = parseFloat(document.getElementById(valId).value)||0; return document.getElementById(unitId).value==='min'?val*60:val; }
 
         function analyze() {
@@ -329,9 +368,16 @@
             elStageBg.className = colorClass;
             if (pipWindow) pipWindow.document.body.className = colorClass;
             updateSidebars(step);
+            
             if(step.phase === 'WAIT' || step.phase === 'PAUSE') {
                 targetTime = null; elTimer.innerText = "--:--";
-                elActionBtn.style.display = 'inline-block'; elActionBtn.innerText = (step.phase === 'WAIT') ? "BEGIN EXAM" : "START FLIGHT";
+                // Only show Action Button to the Host
+                if (isHost) {
+                    elActionBtn.style.display = 'inline-block'; 
+                    elActionBtn.innerText = (step.phase === 'WAIT') ? "BEGIN EXAM" : "START FLIGHT";
+                } else {
+                    elActionBtn.style.display = 'none';
+                }
                 if(step.phase === 'PAUSE') playBeep(600, 0.5);
                 broadcastState(); return;
             }
@@ -367,7 +413,7 @@
             }
         }, 100);
 
-        function finish() { targetTime = null; elStatus.innerText = "DONE"; elTimer.innerText = "00:00"; elStageBg.className = 'main-stage mode-done'; if(pipWindow) pipWindow.document.body.className = 'main-stage mode-done'; broadcastState(); }
+        function finish() { targetTime = null; elStatus.innerText = "DONE"; elTimer.innerText = "00:00"; elStageBg.className = 'main-stage mode-done'; if(pipWindow) pipWindow.document.body.className = 'main-stage mode-done'; broadcastState(); elActionBtn.style.display = 'none'; }
 
         function updateSidebars(step) {
             let cur = [], nxt = [];
@@ -429,11 +475,16 @@
                 useSSL: true,
                 onSuccess: () => {
                     setStatus(true, "Online");
-                    if(isHost) { client.subscribe(`osce/${id}/cmd`); } 
-                    else { 
+                    if(isHost) { 
+                        client.subscribe(`osce/${id}/cmd`); 
+                    } else { 
                         client.subscribe(`osce/${id}/state`);
-                        if(document.getElementById('view-remote-login').classList.contains('active')) switchView('view-remote');
-                        else if(!isHost && document.getElementById('view-landing').classList.contains('active')) switchView('view-run');
+                        if(document.getElementById('view-remote-login').classList.contains('active')) {
+                            switchView('view-remote');
+                        } else {
+                            // Automatically switches to View Run for Viewer Mode
+                            switchView('view-run');
+                        }
                     }
                 },
                 onFailure: () => { 
