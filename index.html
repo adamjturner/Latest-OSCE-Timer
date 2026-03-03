@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Final Polish)</title>
+    <title>OSCE Master (Merged & Polished)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         /* --- VARIABLES --- */
         :root {
             --bg: #121212; --surf: #1e1e1e; --text: #ffffff;
             --accent: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444; --purple: #8b5cf6;
-            --prep-color: #d97706; --station-color: #059669; --move-color: #2563eb;
+            --prep-color: #d97706; --station-color: #059669; --move-color: #2563eb; --feedback-color: #7e22ce;
             --ready-color: #374151; --standby-color: #0f172a; --stop-color: #b91c1c;
             --intermission-color: #111; --extra-prep: #7c2d12; --extra-station: #064e3b;
             --sidebar-bg: #111; --border: #333;
@@ -37,7 +37,7 @@
         #view-landing { align-items: center; justify-content: center; gap: 20px; z-index: 200; background: var(--bg); }
         .landing-btn-group { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 1000px; }
         
-        .btn-xl { padding: 25px 40px; font-size: 1.5rem; border: none; border-radius: 12px; width: 300px; font-weight: bold; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s; }
+        .btn-xl { padding: 25px 40px; font-size: 1.5rem; border: none; border-radius: 12px; width: 300px; font-weight: bold; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s; white-space: nowrap; }
         .btn-host { background: var(--accent); box-shadow: 0 4px 15px rgba(37,99,235,0.4); }
         .btn-remote { background: var(--purple); box-shadow: 0 4px 15px rgba(139,92,246,0.4); }
         .btn-viewer { background: var(--amber); box-shadow: 0 4px 15px rgba(245,158,11,0.4); }
@@ -47,7 +47,7 @@
         #view-setup { padding: 40px; max-width: 900px; margin: 0 auto; width: 100%; overflow-y: auto; padding-bottom: 80px; }
         .card { background: var(--surf); padding: 25px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
         h2 { margin-top: 0; font-weight: 300; border-bottom: 1px solid #444; padding-bottom: 10px; }
-        textarea { width: 100%; height: 120px; background: #2d2d2d; border: 1px solid #444; color: #fff; padding: 10px; font-family: monospace; border-radius: 4px; }
+        textarea { width: 100%; height: 120px; background: #2d2d2d; border: 1px solid #444; color: #fff; padding: 10px; font-family: monospace; border-radius: 4px; white-space: pre; }
         .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 15px; }
         label { display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 5px; }
         input, select { background: #333; border: 1px solid #555; color: white; padding: 10px; width: 100%; border-radius: 6px; }
@@ -61,13 +61,16 @@
         .sb-header { margin: 0; padding: 15px; text-transform: uppercase; font-size: 1rem; color: #888; border-bottom: 1px solid #333; text-align: center; background: #161616; flex-shrink: 0; letter-spacing: 1px; }
         
         .student-list { list-style: none; padding: 10px; margin: 0; flex-grow: 1; overflow-y: auto; }
-        .student-item { padding: 10px 12px; margin-bottom: 6px; background: #252525; border-radius: 4px; border-left: 5px solid #555; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; }
-        .group-tag { font-size: 0.7rem; font-weight: bold; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; background: #444; color: #ddd; min-width: 45px; text-align: center; }
+        .student-item { padding: 10px 12px; margin-bottom: 6px; background: #252525; border-radius: 4px; border-left: 5px solid #555; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .group-tag { font-size: 0.7rem; font-weight: bold; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; background: #444; color: #ddd; min-width: 45px; text-align: center; white-space: nowrap; }
         
         .grp-red { border-left-color: #ef4444 !important; } .grp-red .group-tag { background: #7f1d1d; color: #fecaca; }
         .grp-blue { border-left-color: #3b82f6 !important; } .grp-blue .group-tag { background: #1e3a8a; color: #bfdbfe; }
         .grp-green { border-left-color: #10b981 !important; } .grp-green .group-tag { background: #064e3b; color: #a7f3d0; }
         .grp-yellow { border-left-color: #eab308 !important; } .grp-yellow .group-tag { background: #713f12; color: #fef08a; }
+
+        .skip-btn { background: #ef4444; color: white; border: none; border-radius: 4px; width: 24px; height: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.8; }
+        .skip-btn:hover { opacity: 1; transform: scale(1.1); }
 
         .main-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 100%; height: 100%; transition: background 0.5s; position: relative; overflow: hidden; }
         
@@ -76,6 +79,7 @@
         .main-stage.mode-ready { background-color: var(--ready-color); }
         .main-stage.mode-prep { background-color: var(--prep-color); }
         .main-stage.mode-station { background-color: var(--station-color); }
+        .main-stage.mode-feedback { background-color: var(--feedback-color); }
         .main-stage.mode-move { background-color: var(--move-color); }
         .main-stage.mode-intermission { background-color: var(--intermission-color); }
         .main-stage.mode-et-prep { background-color: var(--extra-prep); }
@@ -87,20 +91,20 @@
         #timer { font-size: 18vw; font-weight: 700; line-height: 0.9; font-variant-numeric: tabular-nums; margin: 10px 0; letter-spacing: -5px; }
         #info-bar { font-size: 1.5vw; background: rgba(0,0,0,0.4); padding: 8px 30px; border-radius: 50px; margin-top: 20px; color: rgba(255,255,255,0.9); border: 1px solid rgba(255,255,255,0.1); }
 
-        #action-btn { display: none; margin-top: 30px; font-size: 1.5rem; padding: 15px 50px; background: white; color: black; border: none; border-radius: 50px; cursor: pointer; animation: pulse 2s infinite; box-shadow: 0 0 20px rgba(0,0,0,0.5); z-index: 100; font-weight: bold; }
+        #action-btn { display: none; margin-top: 20px; font-size: 1.5rem; padding: 15px 50px; background: white; color: black; border: none; border-radius: 50px; cursor: pointer; animation: pulse 2s infinite; box-shadow: 0 0 20px rgba(0,0,0,0.5); z-index: 100; font-weight: bold; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
         #top-right-tools { position: absolute; top: 20px; right: 20px; z-index: 1000; }
         .tool-btn { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 20px; cursor: pointer; text-transform: uppercase; font-size: 0.8rem; font-weight: bold; transition: background 0.2s; }
         .tool-btn:hover { background: rgba(255,255,255,0.3); }
 
-        /* HOST SHARE BAR */
+        /* HOST SHARE BAR (Bottom) */
         #host-share-bar { 
             position: fixed; bottom: 0; left: 0; width: 100%; 
             background: rgba(0,0,0,0.95); padding: 15px; 
             text-align: center; border-top: 1px solid #444; 
             display: none; z-index: 9000;
-            display: flex; align-items: center; justify-content: center; gap: 20px;
+            align-items: center; justify-content: center; gap: 20px;
         }
         .share-link { color: var(--green); font-family: monospace; font-size: 1.1rem; border-bottom: 1px dashed var(--green); cursor: pointer; transition: color 0.3s; }
 
@@ -139,7 +143,7 @@
     <div id="view-setup" class="view">
         <div class="card">
             <h2>Student Data</h2>
-            <textarea id="paste-area" placeholder="Example:&#10;Noah    Red&#10;Nargis  Green&#10;John    Blue"></textarea>
+            <textarea id="paste-area" placeholder="ET&#9;Student&#9;Surname&#9;Red&#10;&#9;Forename&#9;Student&#9;Red"></textarea>
             <button class="btn-full" style="background:#4b5563; width:auto; padding:10px 20px; font-size:1rem;" onclick="analyze()">Analyze & Group</button>
             <span id="analysis-summary" style="color:#aaa; margin-left:10px;"></span>
         </div>
@@ -148,6 +152,7 @@
             <div class="config-grid">
                 <div><label>Prep Time</label><div class="input-wrapper"><input type="number" id="val-prep" value="1"><select id="unit-prep"><option value="min">Min</option><option value="sec">Sec</option></select></div></div>
                 <div><label>Station Time</label><div class="input-wrapper"><input type="number" id="val-station" value="7"><select id="unit-station"><option value="min">Min</option><option value="sec">Sec</option></select></div></div>
+                <div><label>Feedback Time</label><div class="input-wrapper"><input type="number" id="val-feedback" value="0"><select id="unit-feedback"><option value="min">Min</option><option value="sec">Sec</option></select></div></div>
                 <div><label>Move Time</label><div class="input-wrapper"><input type="number" id="val-move" value="1"><select id="unit-move"><option value="min">Min</option><option value="sec">Sec</option></select></div></div>
                 <div><label>Lead-In (Start)</label><input type="number" id="val-leadin" value="10"></div>
                 <div><label>Max Capacity</label><input type="number" id="capacity" value="12"></div>
@@ -171,6 +176,11 @@
                 <div id="status-text">WELCOME</div>
                 <div id="timer">--:--</div>
                 <div id="info-bar">WAITING FOR HOST...</div>
+                
+                <div id="dynamic-capacity-container" style="display:none; margin-top:20px; background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 8px;">
+                    <label for="dyn-capacity" style="font-size:0.9rem; color:#aaa; text-transform:uppercase;">Next Flight Capacity:</label>
+                    <input type="number" id="dyn-capacity" value="12" oninput="updateSidebars(schedule[currentStepIndex])" style="width:70px; font-size:1.2rem; text-align:center; margin-left:10px; background:#222; color:#fff; border:1px solid #555; border-radius:4px;">
+                </div>
             </div>
             <button id="action-btn" onclick="nextSection()">BEGIN</button>
         </div>
@@ -229,7 +239,11 @@
         const PORT = 8084;
         let client = null, examID = "", isHost = false, pipWindow = null;
         let targetTime = null, isPaused = false, pauseTimeLeft = 0;
+        
+        // QUEUE VARIABLES
         let etStudents = [], stdStudents = [], schedule = [], currentStepIndex = 0;
+        let etQueue = [], stdQueue = [], activeFlightStudents = [], flightCounter = 1;
+        
         let capacity = 12; let audioCtx = null;
         let elStatus, elTimer, elInfo, elStageBg, elActionBtn;
 
@@ -268,7 +282,6 @@
             document.getElementById(id).classList.add('active');
             if(id==='view-run') document.getElementById('view-run').style.display='grid';
             
-            // HIDE SHARE BAR ON EVERYTHING EXCEPT HOST VIEWS
             if(id !== 'view-setup' && id !== 'view-run' || !isHost) {
                 document.getElementById('host-share-bar').style.display = 'none';
             }
@@ -309,55 +322,81 @@
             etStudents = []; stdStudents = [];
             const etTriggers = ['et', 'yes', '25', '25%', 'extra', 'y'];
             const colorTriggers = ['red', 'blue', 'green', 'yellow'];
+            
             lines.forEach(line => {
                 const tokens = line.replace(/\r/g, '').split('\t').map(t => t.trim());
                 if (tokens.join('').length === 0) return;
-                let group = "Unknown", groupIndex = -1;
-                for (let i = tokens.length - 1; i >= 0; i--) { if (colorTriggers.some(c => tokens[i].toLowerCase().includes(c))) { group = tokens[i]; groupIndex = i; break; } }
+                let group = "", groupIndex = -1;
+                for (let i = tokens.length - 1; i >= 0; i--) { 
+                    if (colorTriggers.some(c => tokens[i].toLowerCase().includes(c))) { group = tokens[i]; groupIndex = i; break; } 
+                }
                 let isExtra = false, nameStart = 0;
                 const first = tokens[0].toLowerCase();
                 if (etTriggers.includes(first) || first.startsWith('25%')) { isExtra = true; nameStart = 1; }
                 else if (first === "") { isExtra = false; nameStart = 1; }
                 const nameEnd = (groupIndex > -1) ? groupIndex : tokens.length;
                 const name = tokens.slice(nameStart, nameEnd).filter(n => n).join(' ');
-                const obj = { name: name || "Student", group: group };
-                if (isExtra) etStudents.push(obj); else stdStudents.push(obj);
+                
+                const studentObj = { 
+                    id: 'stu_' + Math.random().toString(36).substr(2, 9), 
+                    name: name || "Student", 
+                    group: group 
+                };
+                
+                if (isExtra) etStudents.push(studentObj); else stdStudents.push(studentObj);
             });
             const etF = Math.ceil(etStudents.length/capacity); const stdF = Math.ceil(stdStudents.length/capacity);
-            document.getElementById('analysis-summary').innerText = `Found: ${etStudents.length} ET (${etF} flights), ${stdStudents.length} STD (${stdF} flights)`;
+            document.getElementById('analysis-summary').innerText = `Found: ${etStudents.length} ET, ${stdStudents.length} STD`;
         }
 
         function startExam() {
             if(etStudents.length===0 && stdStudents.length===0) analyze();
+            etQueue = [...etStudents];
+            stdQueue = [...stdStudents];
+            flightCounter = 1;
+
+            document.getElementById('dyn-capacity').value = capacity;
+            schedule = [{ type: 'STANDBY', phase: 'WAIT', duration: 0, label: 'WELCOME', sub: 'WAITING TO START', colorClass: 'mode-standby' }];
+
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            switchView('view-run'); currentStepIndex = 0; runStep();
+        }
+
+        // QUEUE BUILDER
+        function buildNextFlightSteps() {
+            let cap = parseInt(document.getElementById('dyn-capacity').value) || capacity;
+            if (etQueue.length === 0 && stdQueue.length === 0) return false;
+
+            let isET = etQueue.length > 0;
+            let type = isET ? 'ET' : 'STD';
+            let queue = isET ? etQueue : stdQueue;
+
+            activeFlightStudents = queue.splice(0, cap); 
+
             const basePrep = getSeconds('val-prep', 'unit-prep');
             const baseStation = getSeconds('val-station', 'unit-station');
+            const baseFeedback = getSeconds('val-feedback', 'unit-feedback');
             const baseMove = getSeconds('val-move', 'unit-move');
-            const leadIn = parseFloat(document.getElementById('val-leadin').value) || 10;
+            const leadIn = parseFloat(document.getElementById('val-leadin').value) || 0;
             const stationsCount = parseInt(document.getElementById('stations-count').value) || 4;
-            schedule = [];
-            schedule.push({ type:'STANDBY', phase:'WAIT', duration:0, label:'WELCOME', sub:'PLEASE WAIT', colorClass:'mode-standby', nextType:(etStudents.length>0)?'ET':'STD', nextIdx:0 });
-            if(leadIn > 0) schedule.push({ type:'LEAD_IN', phase:'READY', duration:leadIn, label:'GET READY', sub:'STARTING...', colorClass:'mode-ready', nextType:(etStudents.length>0)?'ET':'STD', nextIdx:0 });
-            const createFlight = (type, idx) => {
-                const isET = type === 'ET';
-                const p = isET ? basePrep * 1.25 : basePrep; const s = isET ? baseStation * 1.25 : baseStation;
-                const cP = isET ? 'mode-et-prep' : 'mode-prep'; const cS = isET ? 'mode-et-station' : 'mode-station';
-                for(let i=1; i<=stationsCount; i++) {
-                    schedule.push({ type, phase:'PREP', duration:p, label:'PREPARATION', sub:`${type} FLIGHT ${idx+1} - STATION ${i}`, colorClass:cP, flightIndex:idx });
-                    schedule.push({ type, phase:'STATION', duration:s, label:'STATION', sub:`${type} FLIGHT ${idx+1} - STATION ${i}`, colorClass:cS, flightIndex:idx });
-                    schedule.push({ type, phase:'MOVE', duration:baseMove, label:'MOVE', sub:'ROTATE', colorClass:'mode-move', flightIndex:idx });
-                }
-            };
-            const etCount = Math.ceil(etStudents.length/capacity);
-            for(let i=0; i<etCount; i++) {
-                createFlight('ET', i);
-                if(i+1<etCount || stdStudents.length>0) schedule.push({ type:'INTERMISSION', phase:'PAUSE', duration:0, label:'INTERMISSION', sub:'NEXT GROUP', colorClass:'mode-intermission', nextType:(i+1<etCount)?'ET':'STD', nextIdx:(i+1<etCount)?i+1:0 });
+            const mult = isET ? 1.25 : 1;
+
+            if (schedule[currentStepIndex].type === 'STANDBY' && leadIn > 0) {
+                schedule.push({ type: 'LEAD_IN', phase: 'READY', duration: leadIn, label: 'GET READY', sub: 'EXAM STARTING', colorClass: 'mode-ready' });
             }
-            const stdCount = Math.ceil(stdStudents.length/capacity);
-            for(let i=0; i<stdCount; i++) {
-                createFlight('STD', i);
-                if(i+1<stdCount) schedule.push({ type:'INTERMISSION', phase:'PAUSE', duration:0, label:'INTERMISSION', sub:'NEXT GROUP', colorClass:'mode-intermission', nextType:'STD', nextIdx:i+1 });
+
+            for(let s = 1; s <= stationsCount; s++) {
+                schedule.push({ type, phase: 'PREP', duration: basePrep * mult, label: 'PREPARATION', sub: `${type} FLIGHT ${flightCounter} - STN ${s}`, colorClass: isET ? 'mode-et-prep' : 'mode-prep' });
+                schedule.push({ type, phase: 'STATION', duration: baseStation * mult, label: 'STATION', sub: `${type} FLIGHT ${flightCounter} - STN ${s}`, colorClass: isET ? 'mode-et-station' : 'mode-station' });
+                if(baseFeedback > 0) schedule.push({ type, phase: 'FEEDBACK', duration: baseFeedback, label: 'FEEDBACK', sub: `GIVE FEEDBACK - STN ${s}`, colorClass: 'mode-feedback' });
+                schedule.push({ type, phase: 'MOVE', duration: baseMove, label: 'MOVE', sub: 'MOVE TO NEXT STATION', colorClass: 'mode-move' });
             }
-            switchView('view-run'); currentStepIndex = 0; runStep();
+            flightCounter++;
+
+            if (etQueue.length > 0 || stdQueue.length > 0) {
+                schedule.push({ type: 'INTERMISSION', phase: 'PAUSE', duration: 0, label: 'INTERMISSION', sub: 'PREPARE NEXT GROUP', colorClass: 'mode-intermission' });
+            }
+            return true;
         }
 
         function runStep() {
@@ -369,23 +408,44 @@
             if (pipWindow) pipWindow.document.body.className = colorClass;
             updateSidebars(step);
             
+            const dynCapContainer = document.getElementById('dynamic-capacity-container');
+
             if(step.phase === 'WAIT' || step.phase === 'PAUSE') {
                 targetTime = null; elTimer.innerText = "--:--";
-                // Only show Action Button to the Host
                 if (isHost) {
                     elActionBtn.style.display = 'inline-block'; 
                     elActionBtn.innerText = (step.phase === 'WAIT') ? "BEGIN EXAM" : "START FLIGHT";
+                    dynCapContainer.style.display = 'block';
                 } else {
                     elActionBtn.style.display = 'none';
+                    dynCapContainer.style.display = 'none';
                 }
                 if(step.phase === 'PAUSE') playBeep(600, 0.5);
                 broadcastState(); return;
             }
-            elActionBtn.style.display = 'none'; targetTime = Date.now() + (step.duration * 1000); isPaused = false;
-            if(step.phase === 'STATION') playBeep(800, 0.5); else if(step.phase === 'PREP') playBeep(440, 0.5);
+            
+            elActionBtn.style.display = 'none'; 
+            dynCapContainer.style.display = 'none';
+            targetTime = Date.now() + (step.duration * 1000); 
+            isPaused = false;
+            
+            if(step.phase === 'STATION') playBeep(800, 0.5); 
+            else if(step.phase === 'PREP') playBeep(440, 0.5);
+            else if(step.phase === 'FEEDBACK') playBeep(700, 0.4);
+            else if(step.phase === 'MOVE') playBeep(600, 0.3);
+            
             broadcastState();
         }
-        function nextSection() { currentStepIndex++; runStep(); }
+
+        function nextSection() { 
+            const currentStep = schedule[currentStepIndex];
+            if (currentStep && (currentStep.phase === 'PAUSE' || currentStep.phase === 'WAIT')) {
+                const built = buildNextFlightSteps();
+                if (!built) { finish(); return; }
+            }
+            currentStepIndex++; runStep(); 
+        }
+        
         function togglePause() { isPaused = !isPaused; if(isPaused) { pauseTimeLeft = targetTime - Date.now(); targetTime = null; } else { targetTime = Date.now() + pauseTimeLeft; } broadcastState(); }
         
         setInterval(() => {
@@ -415,28 +475,47 @@
 
         function finish() { targetTime = null; elStatus.innerText = "DONE"; elTimer.innerText = "00:00"; elStageBg.className = 'main-stage mode-done'; if(pipWindow) pipWindow.document.body.className = 'main-stage mode-done'; broadcastState(); elActionBtn.style.display = 'none'; }
 
-        function updateSidebars(step) {
-            let cur = [], nxt = [];
-            const getSlice = (arr, i) => arr.slice(i*capacity, (i*capacity)+capacity);
-            if (step.type === 'STANDBY' || step.type === 'LEAD_IN' || step.type === 'INTERMISSION') {
-                document.getElementById('lbl-left').innerText = "Get Ready";
-                const type = step.nextType; const idx = step.nextIdx;
-                cur = (type === 'ET') ? getSlice(etStudents, idx) : getSlice(stdStudents, idx);
-                const etF = Math.ceil(etStudents.length/capacity); const stdF = Math.ceil(stdStudents.length/capacity);
-                if(type === 'ET') { nxt = (idx+1 < etF) ? getSlice(etStudents, idx+1) : (stdStudents.length > 0 ? getSlice(stdStudents, 0) : []); }
-                else { nxt = (idx+1 < stdF) ? getSlice(stdStudents, idx+1) : []; }
-            } else {
-                document.getElementById('lbl-left').innerText = "Current";
-                cur = (step.type === 'ET') ? getSlice(etStudents, step.flightIndex) : getSlice(stdStudents, step.flightIndex);
-                const currentIdx = step.flightIndex;
-                const etF = Math.ceil(etStudents.length/capacity); const stdF = Math.ceil(stdStudents.length/capacity);
-                if(step.type === 'ET') { if(currentIdx + 1 < etF) nxt = getSlice(etStudents, currentIdx + 1); else if(stdStudents.length > 0) nxt = getSlice(stdStudents, 0); } 
-                else { if(currentIdx + 1 < stdF) nxt = getSlice(stdStudents, currentIdx + 1); }
+        // SIDEBAR & QUEUE RENDER
+        function getPeekQueues(cap) {
+            let current = [], next = [];
+            if (etQueue.length > 0) {
+                current = etQueue.slice(0, cap);
+                next = etQueue.length > cap ? etQueue.slice(cap, cap * 2) : stdQueue.slice(0, cap);
+            } else if (stdQueue.length > 0) {
+                current = stdQueue.slice(0, cap);
+                next = stdQueue.slice(cap, cap * 2);
             }
-            renderStudentList('list-current', cur); renderStudentList('list-next', nxt);
+            return { current, next };
         }
 
-        function renderStudentList(id, list) {
+        function skipStudent(id) {
+            etQueue = etQueue.filter(s => s.id !== id);
+            stdQueue = stdQueue.filter(s => s.id !== id);
+            updateSidebars(schedule[currentStepIndex]);
+        }
+
+        function updateSidebars(step) {
+            if(!step) return;
+            let cap = parseInt(document.getElementById('dyn-capacity').value) || capacity;
+            let current = [], next = [];
+            let isPausable = (step.phase === 'PAUSE' || step.phase === 'WAIT');
+
+            if (isPausable) {
+                let peek = getPeekQueues(cap);
+                current = peek.current; next = peek.next;
+                document.getElementById('lbl-left').innerText = "On Deck";
+            } else {
+                current = activeFlightStudents;
+                let peek = getPeekQueues(cap);
+                next = peek.current; 
+                document.getElementById('lbl-left').innerText = "Current";
+            }
+            
+            renderStudentList('list-current', current, isPausable); 
+            renderStudentList('list-next', next, false);
+        }
+
+        function renderStudentList(id, list, showSkipBtn) {
             const ul = document.getElementById(id); ul.innerHTML = '';
             if(!list || list.length===0) { ul.innerHTML = '<li style="padding:15px; color:#555; text-align:center;">-</li>'; return; }
             const sorted = [...list].sort((a, b) => (a.group || "").localeCompare(b.group || ""));
@@ -444,10 +523,23 @@
                 const li = document.createElement('li');
                 let c = ""; const g = (s.group||"").toLowerCase();
                 if(g.includes('red')) c='grp-red'; else if(g.includes('blue')) c='grp-blue'; else if(g.includes('green')) c='grp-green'; else if(g.includes('yellow')) c='grp-yellow';
-                li.className = `student-item ${c}`; li.innerHTML = `<span>${s.name}</span><span class="group-tag">${s.group}</span>`; ul.appendChild(li);
+                li.className = `student-item ${c}`; 
+                
+                let skipHtml = (isHost && showSkipBtn) ? `<button class="skip-btn" onclick="skipStudent('${s.id}')" title="Skip/Absent">✕</button>` : '';
+                let groupHtml = s.group ? `<span class="group-tag">${s.group}</span>` : '';
+
+                li.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        ${skipHtml}
+                        <span>${s.name}</span>
+                    </div>
+                    ${groupHtml}
+                `; 
+                ul.appendChild(li);
             });
         }
 
+        // MQTT COMMS
         function connectMQTT(id) {
             setStatus(false, "Connecting...");
             const clientId = (isHost?"host_":"conn_") + Math.random().toString(16).substr(2,8);
@@ -455,22 +547,43 @@
             client.onConnectionLost = (o) => { setStatus(false, "Lost Connection"); };
             client.onMessageArrived = (msg) => {
                 const d = JSON.parse(msg.payloadString);
+                
+                // HOST COMMAND PROCESSING
                 if(isHost) {
-                    if(d.act === 'CLICK' && elActionBtn.style.display !== 'none') nextSection();
-                    if(d.act === 'PAUSE') togglePause();
+                    if(msg.destinationName.endsWith('/cmd')) {
+                        if(d.act === 'CLICK' && elActionBtn.style.display !== 'none') nextSection();
+                        if(d.act === 'PAUSE') togglePause();
+                    }
                     return;
                 }
-                targetTime = d.target; isPaused = d.paused; pauseTimeLeft = d.ptl;
-                if(document.getElementById('view-remote').classList.contains('active')) {
-                    document.getElementById('rem-lbl').innerText = d.lbl; document.getElementById('rem-sub').innerText = d.sub;
-                    const colorName = d.col.replace('mode-','').replace('main-stage','').trim();
-                    document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+colorName+'-color');
-                } else {
-                    elStatus.innerText = d.lbl; elInfo.innerText = d.sub;
-                    const colClass = 'main-stage ' + d.col; elStageBg.className = colClass;
-                    if(pipWindow) pipWindow.document.body.className = colClass;
+                
+                // REMOTE / VIEWER STATE PROCESSING
+                if(msg.destinationName.endsWith('/state')) {
+                    targetTime = d.target; isPaused = d.paused; pauseTimeLeft = d.ptl;
+                    
+                    // Render UI for Remote Code View
+                    if(document.getElementById('view-remote').classList.contains('active')) {
+                        document.getElementById('rem-lbl').innerText = d.lbl; document.getElementById('rem-sub').innerText = d.sub;
+                        const colorName = d.col.replace('mode-','').replace('main-stage','').trim();
+                        document.getElementById('rem-bg').style.background = getComputedStyle(document.body).getPropertyValue('--'+colorName+'-color');
+                    } 
+                    // Render UI for Viewer Mode (Dashboard)
+                    else {
+                        elStatus.innerText = d.lbl; elInfo.innerText = d.sub;
+                        const colClass = 'main-stage ' + d.col; elStageBg.className = colClass;
+                        if(pipWindow) pipWindow.document.body.className = colClass;
+                        
+                        // Hide host-only controls in viewer
+                        elActionBtn.style.display = 'none';
+                        document.getElementById('dynamic-capacity-container').style.display = 'none';
+                        document.querySelectorAll('.skip-btn').forEach(btn => btn.style.display = 'none');
+                    }
+                    
+                    // Trigger sidebar update if queues were passed (simplified - assumes host manages queue UI, viewer just gets list sync)
+                    // For full list sync across devices, we'd need to broadcast activeFlightStudents. For now, Viewer relies purely on the timer sync and stage colors.
                 }
             };
+            
             client.connect({
                 useSSL: true,
                 onSuccess: () => {
@@ -482,7 +595,6 @@
                         if(document.getElementById('view-remote-login').classList.contains('active')) {
                             switchView('view-remote');
                         } else {
-                            // Automatically switches to View Run for Viewer Mode
                             switchView('view-run');
                         }
                     }
@@ -494,6 +606,7 @@
                 }
             });
         }
+        
         function broadcastState() {
             if(!isHost || !client || !client.isConnected()) return;
             const msg = { target: targetTime, paused: isPaused, ptl: pauseTimeLeft, lbl: elStatus.innerText, sub: elInfo.innerText, col: elStageBg.className.split(' ').pop() };
@@ -515,6 +628,7 @@
         }
         
         function playBeep(f,d) { if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); try{const o=audioCtx.createOscillator();const g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=f;o.start();g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);o.stop(audioCtx.currentTime+d);}catch(e){} }
+        
         async function togglePiP() {
             if (!window.documentPictureInPicture) return alert("Use Chrome/Edge.");
             if (pipWindow) { pipWindow.close(); return; }
