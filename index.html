@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCE Master (Final Merged System)</title>
+    <title>OSCE Master (Final System)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     <style>
         /* --- VARIABLES --- */
@@ -22,44 +22,27 @@
         .view { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; flex-direction: column; }
         .view.active { display: flex; }
 
-        /* STATUS DOT */
-        #conn-status {
-            position: fixed; bottom: 20px; left: 20px; z-index: 9999;
-            background: rgba(0,0,0,0.8); padding: 8px 15px; border-radius: 30px;
-            font-size: 0.8rem; font-weight: bold; color: #aaa;
-            display: flex; align-items: center; gap: 10px; border: 1px solid #333;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-        }
-        #conn-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); box-shadow: 0 0 5px var(--red); transition: background 0.3s; }
-        .conn-active #conn-dot { background: var(--green) !important; box-shadow: 0 0 8px var(--green) !important; }
-
-        /* TOP CENTER HOST CODE */
+        /* TOP CENTER SESSION CODE & STATUS */
         #host-code-display {
             position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 9999;
-            background: rgba(0,0,0,0.85); padding: 5px 15px; border-radius: 8px;
+            background: rgba(0,0,0,0.85); padding: 5px 20px; border-radius: 8px;
             border: 1px solid #333; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
             display: none; backdrop-filter: blur(5px); text-align: center;
         }
         .code-title { font-size: 0.55rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0px; }
-        .code-val { font-size: 1.2rem; font-weight: 800; font-family: monospace; color: var(--accent); letter-spacing: 2px; line-height: 1.2; }
+        .code-val { font-size: 1.4rem; font-weight: 800; font-family: monospace; color: var(--accent); letter-spacing: 4px; line-height: 1.2; }
+        .conn-row { display: flex; align-items: center; justify-content: center; font-size: 0.65rem; color: #888; margin-top: 2px; gap: 5px; font-weight: bold; text-transform: uppercase;}
+        .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #444; display: inline-block; transition: background 0.3s; }
+        .conn-dot.dot-green { background: var(--green); box-shadow: 0 0 5px var(--green); }
+        .conn-dot.dot-red { background: var(--red); box-shadow: 0 0 5px var(--red); }
 
-        /* HOST SHARE BAR (BOTTOM) */
-        #host-share-bar { 
-            position: fixed; bottom: 0; left: 0; width: 100%; 
-            background: rgba(0,0,0,0.95); padding: 15px; 
-            text-align: center; border-top: 1px solid #444; 
-            display: none; z-index: 9000;
-            align-items: center; justify-content: center; gap: 20px;
-        }
-        .share-link { color: var(--green); font-family: monospace; font-size: 1.1rem; border-bottom: 1px dashed var(--green); cursor: pointer; transition: color 0.3s; }
-
-        /* 1. LANDING */
+        /* 1. LANDING (Stacked Layout) */
         #view-landing { align-items: center; justify-content: center; gap: 20px; z-index: 200; background: var(--bg); }
-        .landing-btn-group { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 1000px; }
-        .btn-xl { padding: 25px 40px; font-size: 1.5rem; border: none; border-radius: 12px; width: 300px; font-weight: bold; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s; white-space: nowrap; }
+        .landing-btn-group { display: flex; flex-direction: column; gap: 20px; align-items: center; width: 100%; max-width: 400px; }
+        .btn-xl { padding: 25px 20px; font-size: 1.3rem; border: none; border-radius: 12px; width: 90%; font-weight: bold; cursor: pointer; color: white; text-transform: uppercase; letter-spacing: 1px; transition: transform 0.1s; }
         .btn-host { background: var(--accent); box-shadow: 0 4px 15px rgba(37,99,235,0.4); }
         .btn-remote { background: var(--purple); box-shadow: 0 4px 15px rgba(139,92,246,0.4); }
-        .btn-viewer { background: var(--amber); box-shadow: 0 4px 15px rgba(245,158,11,0.4); }
+        .btn-viewer { background: var(--amber); box-shadow: 0 4px 15px rgba(245,158,11,0.4); color: #000; }
         .btn-xl:active { transform: scale(0.98); }
 
         /* 2. SETUP */
@@ -118,7 +101,7 @@
 
         /* 4. REMOTE & VIEWER FORMS */
         #view-remote-passcode, #view-remote-login, #view-viewer-login, #view-remote { align-items: center; justify-content: center; padding: 20px; }
-        .code-input { font-size: 3rem; width: 250px; text-align: center; margin: 20px 0; background: #333; border: 2px solid #555; color: white; border-radius: 12px; padding: 10px; letter-spacing: 5px; }
+        .code-input { font-size: 3rem; width: 200px; text-align: center; margin: 20px 0; background: #333; border: 2px solid #555; color: white; border-radius: 12px; padding: 10px; letter-spacing: 5px; }
         
         .rem-grid { display: grid; grid-template-rows: 1fr 2fr 1fr; width: 100%; height: 100%; gap: 15px; max-width: 500px; }
         .rem-status { background: #222; border-radius: 15px; border: 1px solid #333; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: background 0.3s; }
@@ -129,18 +112,17 @@
 </head>
 <body>
 
-    <div id="conn-status">
-        <div id="conn-dot"></div>
-        <span id="conn-text">Disconnected</span>
-    </div>
-
     <div id="host-code-display">
         <div class="code-title">Session Code</div>
         <div class="code-val" id="code-val">----</div>
+        <div class="conn-row">
+            <span class="conn-dot dot-red" id="conn-dot"></span> 
+            <span id="conn-txt" style="color: var(--red);">Disconnected</span>
+        </div>
     </div>
 
     <div id="view-landing" class="view active">
-        <h1 style="font-size:3rem; margin-bottom:40px;">OSCE Manager</h1>
+        <h1 style="font-size:3rem; margin-bottom:40px; text-align:center;">OSCE Manager</h1>
         <div class="landing-btn-group">
             <button class="btn-xl btn-host" onclick="initHost()">💻 START AS HOST</button>
             <button class="btn-xl btn-remote" onclick="initRemotePasscode()">📱 START AS REMOTE</button>
@@ -204,11 +186,6 @@
         </div>
     </div>
 
-    <div id="host-share-bar">
-        <span style="color:#aaa;">Viewer Link:</span>
-        <span class="share-link" id="btn-copy-link" onclick="copyLink()">📋 Copy Link</span>
-    </div>
-
     <div id="view-remote-passcode" class="view">
         <h2>ENTER REMOTE PASSCODE</h2>
         <input type="password" id="remote-passcode-input" class="code-input" placeholder="****">
@@ -219,13 +196,13 @@
 
     <div id="view-remote-login" class="view">
         <h2>ENTER EXAM CODE</h2>
-        <input type="number" id="remote-code-input" class="code-input" placeholder="000000">
+        <input type="number" id="remote-code-input" class="code-input" placeholder="0000">
         <button class="btn-xl btn-remote" onclick="connectRemote()">CONNECT CONTROLLER</button>
     </div>
 
     <div id="view-viewer-login" class="view">
         <h2>ENTER EXAM CODE</h2>
-        <input type="number" id="viewer-code-input" class="code-input" placeholder="000000">
+        <input type="number" id="viewer-code-input" class="code-input" placeholder="0000">
         <button class="btn-xl btn-viewer" onclick="connectViewer()">WATCH SESSION</button>
         <button onclick="location.reload()" style="margin-top:20px; background:none; border:none; color:#888; text-decoration:underline; cursor:pointer;">Back to menu</button>
     </div>
@@ -251,7 +228,7 @@
         let client = null, examID = "", isHost = false, pipWindow = null;
         let targetTime = null, isPaused = false, pauseTimeLeft = 0;
         
-        // QUEUE & SCHEDULE VARIABLES (Crucial functionality)
+        // QUEUE & SCHEDULE VARIABLES
         let etStudents = [], stdStudents = [], schedule = [], currentStepIndex = 0;
         let etQueue = [], stdQueue = [], activeFlightStudents = [], flightCounter = 1;
         let capacity = 12; let audioCtx = null;
@@ -263,40 +240,34 @@
             elInfo = document.getElementById('info-bar');
             elStageBg = document.getElementById('main-stage-bg');
             elActionBtn = document.getElementById('action-btn');
-
-            const params = new URLSearchParams(window.location.search);
-            const joinID = params.get('join');
-            if(joinID) {
-                isHost = false;
-                examID = joinID;
-                document.getElementById('viewer-msg').style.display = 'block';
-                document.querySelector('.landing-btn-group').style.display = 'none';
-                
-                setTimeout(() => {
-                    document.getElementById('force-load-btn').style.display = 'inline-block';
-                    document.getElementById('viewer-txt').innerText = "Taking too long?";
-                }, 5000);
-
-                connectMQTT(joinID);
-            }
         };
 
         function forceViewerLoad() { switchView('view-run'); }
+        
         function setStatus(connected, msg) {
-            const ind = document.getElementById('conn-status'); const txt = document.getElementById('conn-text');
-            if(connected) { ind.classList.add('conn-active'); txt.innerText = "Online"; txt.style.color = "var(--green)"; }
-            else { ind.classList.remove('conn-active'); txt.innerText = msg||"Offline"; txt.style.color = "var(--red)"; }
+            const ind = document.getElementById('conn-dot'); 
+            const txt = document.getElementById('conn-txt');
+            if (!ind || !txt) return;
+            if(connected) { 
+                ind.className = 'conn-dot dot-green'; 
+                txt.innerText = "Online"; 
+                txt.style.color = "var(--green)"; 
+            } else { 
+                ind.className = 'conn-dot dot-red'; 
+                txt.innerText = msg || "Offline"; 
+                txt.style.color = "var(--red)"; 
+            }
         }
+
         function switchView(id) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.getElementById(id).classList.add('active');
-            if(id==='view-run') document.getElementById('view-run').style.display='grid';
+            if(id === 'view-run') document.getElementById('view-run').style.display='grid';
             
-            if(isHost && (id === 'view-setup' || id === 'view-run')) {
-                document.getElementById('host-share-bar').style.display = 'flex';
+            // Show the top center code & connection dot for Setup and Run phases (for Host and Viewers)
+            if(id === 'view-setup' || id === 'view-run') {
                 document.getElementById('host-code-display').style.display = 'block';
             } else {
-                document.getElementById('host-share-bar').style.display = 'none';
                 document.getElementById('host-code-display').style.display = 'none';
             }
         }
@@ -304,7 +275,7 @@
         // --- INITIATION FUNCTIONS ---
         function initHost() { 
             isHost = true; 
-            examID = Math.floor(100000 + Math.random() * 900000).toString(); 
+            examID = Math.floor(1000 + Math.random() * 9000).toString(); // Changed to 4 digits
             document.getElementById('code-val').innerText = examID; 
             switchView('view-setup'); 
             connectMQTT(examID); 
@@ -609,6 +580,9 @@
                 useSSL: true,
                 onSuccess: () => {
                     setStatus(true, "Online");
+                    // Apply code to display for Viewer once connected
+                    document.getElementById('code-val').innerText = id;
+                    
                     if(isHost) { 
                         client.subscribe(`osce/${id}/cmd`); 
                     } else { 
@@ -643,19 +617,6 @@
             const m = new Paho.MQTT.Message(JSON.stringify(msg)); m.destinationName = `osce/${examID}/state`; m.retained = true; client.send(m);
         }
         function sendCmd(act) { if(!client || !client.isConnected()) return; const m = new Paho.MQTT.Message(JSON.stringify({ act })); m.destinationName = `osce/${examID}/cmd`; client.send(m); }
-        
-        function copyLink() { 
-            const link = `${window.location.origin}${window.location.pathname}?join=${examID}`; 
-            navigator.clipboard.writeText(link); 
-            const btn = document.getElementById('btn-copy-link');
-            const originalText = btn.innerText;
-            btn.innerText = "COPIED!";
-            btn.style.color = "var(--green)";
-            setTimeout(() => {
-                btn.innerText = originalText;
-                btn.style.color = "var(--green)";
-            }, 2000);
-        }
         
         function playBeep(f,d) { if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)(); try{const o=audioCtx.createOscillator();const g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.value=f;o.start();g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+d);o.stop(audioCtx.currentTime+d);}catch(e){} }
         
