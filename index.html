@@ -359,7 +359,10 @@
             stdQueue = [...stdStudents];
             flightCounter = 1;
 
+            // --- CAPACITY RUN-TIME INITIALIZATION FIX ---
+            capacity = parseInt(document.getElementById('capacity').value) || 12;
             elDynCapInput.value = capacity;
+
             schedule = [{ type: 'STANDBY', phase: 'WAIT', duration: 0, label: 'WELCOME', sub: 'WAITING TO START', colorClass: 'mode-standby' }];
 
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
